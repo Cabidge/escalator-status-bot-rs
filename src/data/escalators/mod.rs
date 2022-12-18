@@ -67,8 +67,8 @@ impl Statuses {
     pub fn load_persist(persist: &PersistInstance) -> (Self, broadcast::Receiver<Update>) {
         let (escalators, should_save) = persist
             .load::<Escalators>("escalators")
-            .map(|escalators| (escalators, true))
-            .unwrap_or_else(|_| (Self::default_escalators(), false));
+            .map(|escalators| (escalators, false)) // if load success, no need to save
+            .unwrap_or_else(|_| (Self::default_escalators(), true)); // if load failed, create default and save
 
         Self::new(escalators, should_save)
     }
