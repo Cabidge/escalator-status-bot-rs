@@ -57,12 +57,8 @@ async fn init(
         .await
         .map_err(anyhow::Error::new)?;
 
-    let data = framework.user_data().await;
-
-    let save_task = bot_tasks::autosave::begin_task(persist, data);
-
-    let cache_and_http = Arc::clone(&framework.client().cache_and_http);
-    let announcement_task = bot_tasks::announcements::create_task(cache_and_http, updates_rx, data);
+    let save_task = bot_tasks::autosave::begin_task(Arc::clone(&framework), persist);
+    let announcement_task = bot_tasks::announcements::create_task(Arc::clone(&framework), updates_rx);
 
     Ok(EscalatorBot {
         framework,

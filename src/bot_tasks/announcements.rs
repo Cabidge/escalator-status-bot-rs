@@ -12,13 +12,14 @@ const MIN_INTERVAL: Duration = Duration::from_secs(60);
 const MAX_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 pub fn create_task(
-    cache_http: Arc<serenity::CacheAndHttp>,
+    framework: Arc<poise::Framework<Data, Error>>,
     mut updates: broadcast::Receiver<Update>,
-    data: &Data,
 ) -> JoinHandle<()> {
-    let history_channel = Arc::clone(&data.history_channel);
-
     tokio::spawn(async move {
+        let data = framework.user_data().await;
+        let history_channel = Arc::clone(&data.history_channel);
+        let cache_http = Arc::clone(&framework.client().cache_and_http);
+
         let mut last_announcement = Instant::now();
 
         loop {
