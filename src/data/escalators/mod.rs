@@ -54,7 +54,7 @@ type Escalators = IndexMap<Escalator, Info>;
 
 impl Statuses {
     fn new(escalators: Escalators, should_save: bool) -> (Self, broadcast::Receiver<Update>) {
-        let (updates, rx) = broadcast::channel(64);
+        let (updates, rx) = broadcast::channel(32);
         let statuses = Self {
             escalators,
             updates,
