@@ -1,26 +1,31 @@
 pub mod commands;
+pub mod data;
 pub mod interaction;
 pub mod prelude;
 
-use poise::serenity_prelude as serenity;
+use data::Data;
 use std::sync::Arc;
+use tokio::task;
 
 use prelude::*;
 
 struct EscalatorBot {
     framework: Arc<poise::Framework<Data, Error>>,
+    save_task: task::JoinHandle<()>,
+    announcement_task: task::JoinHandle<()>,
 }
-
-pub struct Data;
 
 #[shuttle_service::main]
 async fn init(
     #[shuttle_secrets::Secrets] secret_store: shuttle_secrets::SecretStore,
+    #[shuttle_persist::Persist] persist: shuttle_persist::PersistInstance,
 ) -> Result<EscalatorBot, shuttle_service::Error> {
     // try to get token, errors if token isn't found
     let Some(token) = secret_store.get("TOKEN") else {
         return Err(anyhow::anyhow!("Discord token not found...").into());
     };
+
+    let (data, _) = Data::load_persist(&persist);
 
     // create bot framework
     let framework = poise::Framework::builder()
@@ -42,16 +47,24 @@ async fn init(
         })
         .token(token)
         .intents(serenity::GatewayIntents::non_privileged())
-        .setup(|_ctx, _ready, _framework| {
+        .setup(move |_ctx, _ready, _framework| {
             // set up bot data
             println!("Bot is ready");
-            Box::pin(async move { Ok(Data) })
+            Box::pin(async move { Ok(data) })
         })
         .build()
         .await
         .map_err(anyhow::Error::new)?;
 
-    Ok(EscalatorBot { framework })
+    let save_task = tokio::spawn(async {});
+
+    let announcement_task = tokio::spawn(async {});
+
+    Ok(EscalatorBot {
+        framework,
+        save_task,
+        announcement_task,
+    })
 }
 
 #[shuttle_service::async_trait]
@@ -61,6 +74,8 @@ impl shuttle_service::Service for EscalatorBot {
         _addr: std::net::SocketAddr,
     ) -> Result<(), shuttle_service::error::Error> {
         self.framework.start().await.map_err(anyhow::Error::from)?;
+        self.save_task.await.map_err(anyhow::Error::from)?;
+        self.announcement_task.await.map_err(anyhow::Error::from)?;
 
         Ok(())
     }
