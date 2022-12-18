@@ -3,6 +3,7 @@ pub mod commands;
 pub mod data;
 pub mod interaction;
 pub mod prelude;
+pub mod report_modal;
 
 use std::sync::Arc;
 use tokio::task;
