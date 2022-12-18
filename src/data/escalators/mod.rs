@@ -1,12 +1,12 @@
 mod info;
 
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
 use shuttle_persist::PersistInstance;
 use std::{fmt::Display, str::FromStr};
 use tokio::sync::broadcast;
 
-use self::info::Info;
+use super::status::Status;
+use info::Info;
 
 pub const ESCALATORS: [Escalator; 14] = [
     (2, 3),
@@ -24,13 +24,6 @@ pub const ESCALATORS: [Escalator; 14] = [
     (8, 6),
     (9, 7),
 ];
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Status {
-    Open,
-    Down,
-    Blocked,
-}
 
 type Escalator = (u8, u8);
 

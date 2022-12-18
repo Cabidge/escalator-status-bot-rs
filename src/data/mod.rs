@@ -1,6 +1,7 @@
 pub mod escalators;
 pub mod history_channel;
 pub mod report_menu;
+pub mod status;
 
 pub use escalators::*;
 pub use history_channel::HistoryChannel;
