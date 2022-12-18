@@ -1,9 +1,9 @@
+pub mod autosave;
 pub mod commands;
 pub mod data;
 pub mod interaction;
 pub mod prelude;
 
-use data::Data;
 use std::sync::Arc;
 use tokio::task;
 
@@ -56,7 +56,7 @@ async fn init(
         .await
         .map_err(anyhow::Error::new)?;
 
-    let save_task = tokio::spawn(async {});
+    let save_task = autosave::begin_task(persist, framework.user_data().await);
 
     let announcement_task = tokio::spawn(async {});
 

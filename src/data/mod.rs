@@ -17,6 +17,17 @@ pub struct Data {
 }
 
 impl Data {
+    /// Create a clone of Data by cloning all of the Arcs.
+    ///
+    /// Not deriving Clone for Data because this is more explicit.
+    pub fn clone_arcs(&self) -> Data {
+        let statuses = Arc::clone(&self.statuses);
+        let report_menu = Arc::clone(&self.report_menu);
+        let history_channel = Arc::clone(&self.history_channel);
+
+        Data { statuses, report_menu, history_channel }
+    }
+
     pub fn load_persist(persist: &PersistInstance) -> (Self, broadcast::Receiver<Update>) {
         let (statuses, update_rx) = Statuses::load_persist(persist);
         let statuses = Arc::new(Mutex::new(statuses));
