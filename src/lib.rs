@@ -1,5 +1,5 @@
-pub mod autosave;
 pub mod announcements;
+pub mod autosave;
 pub mod commands;
 pub mod data;
 pub mod interaction;
