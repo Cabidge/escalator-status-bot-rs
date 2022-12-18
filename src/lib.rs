@@ -1,5 +1,4 @@
-pub mod announcements;
-pub mod autosave;
+pub mod bot_tasks;
 pub mod commands;
 pub mod data;
 pub mod interaction;
@@ -59,10 +58,10 @@ async fn init(
 
     let data = framework.user_data().await;
 
-    let save_task = autosave::begin_task(persist, data);
+    let save_task = bot_tasks::autosave::begin_task(persist, data);
 
     let cache_and_http = Arc::clone(&framework.client().cache_and_http);
-    let announcement_task = announcements::create_task(cache_and_http, updates_rx, data);
+    let announcement_task = bot_tasks::announcements::create_task(cache_and_http, updates_rx, data);
 
     Ok(EscalatorBot {
         framework,
