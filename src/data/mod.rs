@@ -25,7 +25,11 @@ impl Data {
         let report_menu = Arc::clone(&self.report_menu);
         let history_channel = Arc::clone(&self.history_channel);
 
-        Data { statuses, report_menu, history_channel }
+        Data {
+            statuses,
+            report_menu,
+            history_channel,
+        }
     }
 
     pub fn load_persist(persist: &PersistInstance) -> (Self, broadcast::Receiver<Update>) {
