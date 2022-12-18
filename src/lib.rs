@@ -1,4 +1,5 @@
 pub mod autosave;
+pub mod announcements;
 pub mod commands;
 pub mod data;
 pub mod interaction;
@@ -25,7 +26,7 @@ async fn init(
         return Err(anyhow::anyhow!("Discord token not found...").into());
     };
 
-    let (data, _) = Data::load_persist(&persist);
+    let (data, updates_rx) = Data::load_persist(&persist);
 
     // create bot framework
     let framework = poise::Framework::builder()
@@ -56,9 +57,12 @@ async fn init(
         .await
         .map_err(anyhow::Error::new)?;
 
-    let save_task = autosave::begin_task(persist, framework.user_data().await);
+    let data = framework.user_data().await;
 
-    let announcement_task = tokio::spawn(async {});
+    let save_task = autosave::begin_task(persist, data);
+
+    let cache_and_http = Arc::clone(&framework.client().cache_and_http);
+    let announcement_task = announcements::create_task(cache_and_http, updates_rx, data);
 
     Ok(EscalatorBot {
         framework,
