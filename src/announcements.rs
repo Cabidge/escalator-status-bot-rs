@@ -41,8 +41,8 @@ pub fn create_task(
                 MIN_INTERVAL
             };
 
-            let mut interval = tokio::time::interval(delay);
-            interval.tick().await; // skip instant tick
+            let sleep = tokio::time::sleep(delay);
+            tokio::pin!(sleep);
 
             // continue to save the updates until the interval is up
             let mut history = vec![first_update];
@@ -52,7 +52,7 @@ pub fn create_task(
                         history.push(next_update);
                         continue;
                     }
-                    _ = interval.tick() => break,
+                    () = &mut sleep => break,
                 }
             }
 
