@@ -6,7 +6,7 @@ pub mod prelude;
 pub mod report_modal;
 
 use std::sync::Arc;
-use tokio::task;
+use tokio::{task, sync::broadcast};
 
 use prelude::*;
 
@@ -27,7 +27,11 @@ async fn init(
         return Err(anyhow::anyhow!("Discord token not found...").into());
     };
 
-    let (data, updates_rx) = Data::load_persist(&persist);
+    let persist = Arc::new(persist);
+
+    let (updates_tx, updates_rx) = broadcast::channel(32);
+
+    let cloned_persist = Arc::clone(&persist);
 
     // create bot framework
     let framework = poise::Framework::builder()
@@ -48,10 +52,15 @@ async fn init(
         })
         .token(token)
         .intents(serenity::GatewayIntents::non_privileged())
-        .setup(move |_ctx, _ready, _framework| {
+        .setup(move |ctx, _ready, _framework| {
             // set up bot data
+            let persist = cloned_persist;
             println!("Bot is ready");
-            Box::pin(async move { Ok(data) })
+
+            Box::pin(async move {
+                let data = Data::load_persist(ctx, updates_tx, &persist).await;
+                Ok(data)
+            })
         })
         .build()
         .await

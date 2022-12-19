@@ -46,24 +46,21 @@ pub enum Update {
 type Escalators = IndexMap<Escalator, Info>;
 
 impl Statuses {
-    fn new(escalators: Escalators, should_save: bool) -> (Self, broadcast::Receiver<Update>) {
-        let (updates, rx) = broadcast::channel(32);
-        let statuses = Self {
+    fn new(escalators: Escalators, updates_tx: broadcast::Sender<Update>, should_save: bool) -> Self {
+        Self {
             escalators,
-            updates,
+            updates: updates_tx,
             should_save,
-        };
-
-        (statuses, rx)
+        }
     }
 
-    pub fn load_persist(persist: &PersistInstance) -> (Self, broadcast::Receiver<Update>) {
+    pub fn load_persist(update_tx: broadcast::Sender<Update>, persist: &PersistInstance) -> Self {
         let (escalators, should_save) = persist
             .load::<Escalators>("escalators")
             .map(|escalators| (escalators, false)) // if load success, no need to save
             .unwrap_or_else(|_| (Self::default_escalators(), true)); // if load failed, create default and save
 
-        Self::new(escalators, should_save)
+        Self::new(escalators, update_tx, should_save)
     }
 
     pub fn save_persist(&mut self, persist: &PersistInstance) {

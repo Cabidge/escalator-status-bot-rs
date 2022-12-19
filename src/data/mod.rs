@@ -7,6 +7,8 @@ pub use escalators::*;
 pub use history_channel::HistoryChannel;
 pub use report_menu::ReportMenu;
 
+use crate::prelude::*;
+
 use shuttle_persist::PersistInstance;
 use std::sync::Arc;
 use tokio::sync::{broadcast, Mutex, RwLock};
@@ -34,25 +36,26 @@ impl Data {
         }
     }
 
-    pub fn load_persist(persist: &PersistInstance) -> (Self, broadcast::Receiver<Update>) {
-        let (statuses, update_rx) = Statuses::load_persist(persist);
+    pub async fn load_persist(context: &serenity::Context, updates_tx: broadcast::Sender<Update>, persist: &PersistInstance) -> Self {
+        let statuses = Statuses::load_persist(updates_tx, persist);
         let statuses = Arc::new(Mutex::new(statuses));
 
-        let report_menu = ReportMenu::load_persist(persist);
+        let res = ReportMenu::load_persist(context, persist).await;
+        if let Err(err) = res.as_ref() {
+            println!("{err:?}");
+        }
+
+        let report_menu = res.unwrap_or_default();
         let report_menu = Arc::new(Mutex::new(report_menu));
 
-        let history_channel = HistoryChannel::load_persist(persist);
+        let history_channel = HistoryChannel::load_persist(persist).unwrap_or_default();
         let history_channel = Arc::new(RwLock::new(history_channel));
 
-        let data = Data {
+        Data {
             statuses,
             report_menu,
             history_channel,
-        };
-
-        println!("loaded: {data:#?}");
-
-        (data, update_rx)
+        }
     }
 
     pub async fn save_persist(&self, persist: &PersistInstance) {

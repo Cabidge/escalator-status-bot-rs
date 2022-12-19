@@ -62,7 +62,7 @@ pub fn begin_task(
             if let Err(err) = history_channel
                 .read()
                 .await
-                .send(&cache_http, |msg| msg.content(format!("{history:#?}")))
+                .send(&cache_http.http, |msg| msg.content(format!("{history:#?}")))
                 .await
             {
                 // TODO: handle error
