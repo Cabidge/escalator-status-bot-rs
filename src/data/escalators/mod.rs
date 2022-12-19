@@ -209,7 +209,7 @@ impl FromStr for EscalatorInput {
         let sep = chars.next().unwrap();
         let right = chars.next().unwrap();
 
-        if sep != '-' || sep != '/' {
+        if sep != '-' && sep != '/' {
             return Err(InputError::UnknownFormat);
         }
 
