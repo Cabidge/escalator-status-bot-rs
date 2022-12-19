@@ -11,6 +11,7 @@ use shuttle_persist::PersistInstance;
 use std::sync::Arc;
 use tokio::sync::{broadcast, Mutex, RwLock};
 
+#[derive(Debug)]
 pub struct Data {
     pub statuses: Arc<Mutex<Statuses>>,
     pub report_menu: Arc<Mutex<ReportMenu>>,
@@ -48,6 +49,8 @@ impl Data {
             report_menu,
             history_channel,
         };
+
+        println!("loaded: {data:#?}");
 
         (data, update_rx)
     }

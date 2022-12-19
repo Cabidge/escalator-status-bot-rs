@@ -2,6 +2,7 @@ use crate::prelude::*;
 
 use shuttle_persist::PersistInstance;
 
+#[derive(Debug)]
 pub struct HistoryChannel {
     channel: Option<serenity::GuildChannel>,
     should_save: bool,

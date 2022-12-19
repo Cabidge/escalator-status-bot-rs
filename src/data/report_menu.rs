@@ -4,6 +4,7 @@ use super::Statuses;
 
 use shuttle_persist::PersistInstance;
 
+#[derive(Debug)]
 pub struct ReportMenu {
     message: Option<serenity::Message>,
     should_save: bool,
