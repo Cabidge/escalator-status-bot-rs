@@ -1,4 +1,4 @@
-use crate::{prelude::*, interaction::add_report_buttons};
+use crate::{interaction::add_report_buttons, prelude::*};
 
 use super::Statuses;
 
@@ -36,11 +36,13 @@ impl ReportMenu {
 
         let content = ctx.data().statuses.lock().await.menu_message();
 
-        let handle = ctx.send(|msg| {
-            msg.content(content)
-                .components(add_report_buttons)
-                .ephemeral(false)
-        }).await?;
+        let handle = ctx
+            .send(|msg| {
+                msg.content(content)
+                    .components(add_report_buttons)
+                    .ephemeral(false)
+            })
+            .await?;
 
         self.message = Some(handle.into_message().await?);
         self.should_save = true;
@@ -59,7 +61,8 @@ impl ReportMenu {
         // ignore failure
         let _ = message.delete(ctx).await.ok();
 
-        ctx.say("Report menu successfully cleared from memory.").await?;
+        ctx.say("Report menu successfully cleared from memory.")
+            .await?;
 
         Ok(())
     }
