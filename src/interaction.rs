@@ -80,6 +80,8 @@ pub async fn handle_interaction(
     Ok(())
 }
 
+pub const REPORT_EMOJI: char = '📢';
+
 /// Generate report button components with the proper IDs.
 pub fn add_report_buttons(
     components: &mut serenity::CreateComponents,
@@ -87,21 +89,21 @@ pub fn add_report_buttons(
     // TODO: DRY, this is unecessarily verbose
     components.create_action_row(|row| {
         row.create_button(|btn| {
-            btn.label("Report Open")
-                .emoji(Status::Open.emoji())
+            btn.label("OPEN")
+                .emoji(REPORT_EMOJI)
                 .style(serenity::ButtonStyle::Success)
                 .custom_id(REPORT_OPEN_ID)
         })
         .create_button(|btn| {
-            btn.label("Report Down")
-                .emoji(Status::Down.emoji())
+            btn.label("DOWN")
+                .emoji(REPORT_EMOJI)
                 .style(serenity::ButtonStyle::Danger)
                 .custom_id(REPORT_DOWN_ID)
         })
         .create_button(|btn| {
-            btn.label("Report Blocked")
-                .emoji(Status::Blocked.emoji())
-                .style(serenity::ButtonStyle::Danger)
+            btn.label("BLOCKED")
+                .emoji(REPORT_EMOJI)
+                .style(serenity::ButtonStyle::Secondary)
                 .custom_id(REPORT_BLOCKED_ID)
         })
     })
