@@ -10,6 +10,8 @@ pub struct Info {
     status: Option<Status>,
 }
 
+const UNKNOWN_STATUS_EMOJI: char = '🟡';
+
 impl Info {
     /// How long it takes before marking an escalator's status as unknown (None).
     const OUTDATED_THRESHOLD: Duration = Duration::from_secs(2 * 60 * 60);
@@ -20,10 +22,8 @@ impl Info {
 
     pub fn status_emoji(&self) -> char {
         match self.status {
-            Some(Status::Open) => '🟢',
-            Some(Status::Down) => '🔴',
-            Some(Status::Blocked) => '⛔',
-            None => '🟡',
+            Some(status) => status.emoji(),
+            None => UNKNOWN_STATUS_EMOJI,
         }
     }
 
