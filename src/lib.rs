@@ -14,6 +14,7 @@ struct EscalatorBot {
     framework: Arc<poise::Framework<Data, Error>>,
     save_task: task::JoinHandle<()>,
     announce_task: task::JoinHandle<()>,
+    sync_task: task::JoinHandle<()>,
 }
 
 #[shuttle_service::main]
@@ -57,12 +58,14 @@ async fn init(
         .map_err(anyhow::Error::new)?;
 
     let save_task = bot_tasks::autosave::begin_task(Arc::clone(&framework), persist);
-    let announce_task = bot_tasks::announcements::begin_task(Arc::clone(&framework), updates_rx);
+    let announce_task = bot_tasks::announcements::begin_task(Arc::clone(&framework), updates_rx.resubscribe());
+    let sync_task = bot_tasks::sync_menu::begin_task(Arc::clone(&framework), updates_rx);
 
     Ok(EscalatorBot {
         framework,
         save_task,
         announce_task,
+        sync_task,
     })
 }
 
@@ -75,6 +78,7 @@ impl shuttle_service::Service for EscalatorBot {
         self.framework.start().await.map_err(anyhow::Error::from)?;
         self.save_task.await.map_err(anyhow::Error::from)?;
         self.announce_task.await.map_err(anyhow::Error::from)?;
+        self.sync_task.await.map_err(anyhow::Error::from)?;
 
         Ok(())
     }
