@@ -34,10 +34,7 @@ pub async fn handle_interaction(
     // override interaction response with the modal
     let modal = ReportModal::create(None, modal_id.clone());
     interaction
-        .create_interaction_response(serenity_ctx, |res| {
-            *res = modal;
-            res
-        })
+        .create_interaction_response(serenity_ctx, replace_builder_with(modal))
         .await?;
 
     let Some(response) = serenity::CollectModalInteraction::new(&serenity_ctx.shard)
