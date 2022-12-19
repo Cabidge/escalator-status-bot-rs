@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, interaction::add_report_buttons};
 
 use super::Statuses;
 
@@ -20,6 +20,46 @@ impl ReportMenu {
         message
             .edit(cache_http, |msg| msg.content(statuses.menu_message()))
             .await?;
+
+        Ok(())
+    }
+
+    pub async fn initialize(&mut self, ctx: Context<'_>) -> Result<(), Error> {
+        if self.message.is_some() {
+            ctx.send(|msg| {
+                msg.content("A report menu already exists, run `/menu clear` to delete it and clear it from memory.")
+                    .ephemeral(true)
+            }).await?;
+
+            return Ok(());
+        }
+
+        let content = ctx.data().statuses.lock().await.menu_message();
+
+        let handle = ctx.send(|msg| {
+            msg.content(content)
+                .components(add_report_buttons)
+                .ephemeral(false)
+        }).await?;
+
+        self.message = Some(handle.into_message().await?);
+        self.should_save = true;
+
+        Ok(())
+    }
+
+    pub async fn clear(&mut self, ctx: Context<'_>) -> Result<(), Error> {
+        let Some(message) = self.message.take() else {
+            ctx.say("Report menu is already cleared.").await?;
+            return Ok(());
+        };
+
+        self.should_save = true;
+
+        // ignore failure
+        let _ = message.delete(ctx).await.ok();
+
+        ctx.say("Report menu successfully cleared from memory.").await?;
 
         Ok(())
     }
