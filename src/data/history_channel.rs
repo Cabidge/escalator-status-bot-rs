@@ -8,6 +8,8 @@ pub struct HistoryChannel {
     should_save: bool,
 }
 
+pub struct InvalidChannelError;
+
 impl HistoryChannel {
     pub async fn send<F>(&self, http: impl AsRef<serenity::Http>, f: F) -> Result<(), Error>
     where
@@ -18,6 +20,25 @@ impl HistoryChannel {
         channel.send_message(http, f).await?;
 
         Ok(())
+    }
+
+    pub fn set(&mut self, channel: serenity::Channel) -> Result<(), InvalidChannelError> {
+        let Some(channel) = channel.guild().filter(serenity::GuildChannel::is_text_based) else {
+            return Err(InvalidChannelError);
+        };
+
+        if self.channel != Some(channel.id) {
+            self.channel = Some(channel.id);
+            self.should_save = true;
+        }
+
+        Ok(())
+    }
+
+    pub fn unset(&mut self) {
+        if self.channel.take().is_some() {
+            self.should_save = true;
+        }
     }
 
     pub fn load_persist(persist: &PersistInstance) -> Result<Self, Error> {
