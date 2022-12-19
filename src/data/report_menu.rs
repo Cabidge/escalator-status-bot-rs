@@ -75,7 +75,10 @@ impl ReportMenu {
         Ok(())
     }
 
-    pub async fn load_persist(http: impl AsRef<serenity::Http>, persist: &PersistInstance) -> Result<Self, Error> {
+    pub async fn load_persist(
+        http: impl AsRef<serenity::Http>,
+        persist: &PersistInstance,
+    ) -> Result<Self, Error> {
         let Some(ids) = persist.load::<Option<(u64, u64)>>("report_menu")? else {
             return Ok(Self::new(None, false));
         };
@@ -89,9 +92,10 @@ impl ReportMenu {
 
     pub fn save_persist(&mut self, persist: &PersistInstance) {
         if self.should_save {
-            let ids = self.message.as_ref().map(|msg| {
-                (msg.channel_id.0, msg.id.0)
-            });
+            let ids = self
+                .message
+                .as_ref()
+                .map(|msg| (msg.channel_id.0, msg.id.0));
 
             let _ = persist.save("report_menu", ids).ok();
 
@@ -100,7 +104,10 @@ impl ReportMenu {
     }
 
     fn new(message: Option<serenity::Message>, should_save: bool) -> Self {
-        Self { message, should_save }
+        Self {
+            message,
+            should_save,
+        }
     }
 }
 

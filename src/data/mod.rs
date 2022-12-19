@@ -36,11 +36,17 @@ impl Data {
         }
     }
 
-    pub async fn load_persist(context: &serenity::Context, updates_tx: broadcast::Sender<Update>, persist: &PersistInstance) -> Self {
+    pub async fn load_persist(
+        context: &serenity::Context,
+        updates_tx: broadcast::Sender<Update>,
+        persist: &PersistInstance,
+    ) -> Self {
         let statuses = Statuses::load_persist(updates_tx, persist);
         let statuses = Arc::new(Mutex::new(statuses));
 
-        let report_menu = ReportMenu::load_persist(context, persist).await.unwrap_or_default();
+        let report_menu = ReportMenu::load_persist(context, persist)
+            .await
+            .unwrap_or_default();
         let report_menu = Arc::new(Mutex::new(report_menu));
 
         let history_channel = HistoryChannel::load_persist(persist).unwrap_or_default();

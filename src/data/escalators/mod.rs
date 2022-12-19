@@ -46,7 +46,11 @@ pub enum Update {
 type Escalators = IndexMap<Escalator, Info>;
 
 impl Statuses {
-    fn new(escalators: Escalators, updates_tx: broadcast::Sender<Update>, should_save: bool) -> Self {
+    fn new(
+        escalators: Escalators,
+        updates_tx: broadcast::Sender<Update>,
+        should_save: bool,
+    ) -> Self {
         Self {
             escalators,
             updates: updates_tx,

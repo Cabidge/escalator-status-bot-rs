@@ -6,7 +6,7 @@ pub mod prelude;
 pub mod report_modal;
 
 use std::sync::Arc;
-use tokio::{task, sync::broadcast};
+use tokio::{sync::broadcast, task};
 
 use prelude::*;
 
