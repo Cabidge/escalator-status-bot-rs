@@ -37,8 +37,7 @@ async fn init(
                 Box::pin(async move {
                     // handle component interactions
                     if let poise::Event::InteractionCreate { interaction } = event {
-                        let http = Arc::clone(&ctx.http);
-                        interaction::handle_interaction(http, interaction, data).await?;
+                        interaction::handle_interaction(ctx, interaction, data).await?;
                     }
 
                     Ok(())
@@ -58,7 +57,8 @@ async fn init(
         .map_err(anyhow::Error::new)?;
 
     let save_task = bot_tasks::autosave::begin_task(Arc::clone(&framework), persist);
-    let announcement_task = bot_tasks::announcements::create_task(Arc::clone(&framework), updates_rx);
+    let announcement_task =
+        bot_tasks::announcements::create_task(Arc::clone(&framework), updates_rx);
 
     Ok(EscalatorBot {
         framework,
