@@ -1,4 +1,4 @@
-use std::{time::Duration, sync::Arc};
+use std::{sync::Arc, time::Duration};
 
 use crate::prelude::*;
 
@@ -8,7 +8,10 @@ use tokio::task::JoinHandle;
 /// How much time to wait between each time trying to save.
 const AUTO_SAVE_INTERVAL: Duration = Duration::from_secs(15 * 60);
 
-pub fn begin_task(framework: Arc<poise::Framework<Data, Error>>, persist: PersistInstance) -> JoinHandle<()> {
+pub fn begin_task(
+    framework: Arc<poise::Framework<Data, Error>>,
+    persist: PersistInstance,
+) -> JoinHandle<()> {
     tokio::spawn(async move {
         let data = framework.user_data().await.clone_arcs();
         let mut interval = tokio::time::interval(AUTO_SAVE_INTERVAL);
