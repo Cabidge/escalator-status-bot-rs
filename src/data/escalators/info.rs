@@ -10,7 +10,7 @@ pub struct Info {
     status: Option<Status>,
 }
 
-const UNKNOWN_STATUS_EMOJI: char = '🟡';
+pub const UNKNOWN_STATUS_EMOJI: char = '🟡';
 
 impl Info {
     /// How long it takes before marking an escalator's status as unknown (None).
