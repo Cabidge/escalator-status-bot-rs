@@ -1,9 +1,14 @@
 mod info;
 
+use crate::prelude::*;
+
 use indexmap::IndexMap;
+use itertools::Itertools;
 use shuttle_persist::PersistInstance;
 use std::{fmt::Display, str::FromStr};
 use tokio::sync::broadcast;
+
+use self::info::UNKNOWN_STATUS_EMOJI;
 
 use super::status::Status;
 use info::Info;
@@ -105,6 +110,132 @@ impl Statuses {
         msg.push_str("```");
 
         msg
+    }
+
+    /// Generates a summary for a specific status.
+    fn summarize_status(status: Option<Status>, escalators: &[Escalator]) -> String {
+        let emoji = match status {
+            Some(status) => status.emoji(),
+            None => UNKNOWN_STATUS_EMOJI,
+        };
+
+        let mut message = format!("`{}` ", emoji);
+
+        if escalators.len() == ESCALATORS.len() {
+            // all
+            message.push_str("`ALL` escalators");
+        } else if escalators.len() >= ESCALATORS.len() / 2 {
+            // more than half
+            message.push_str("`MANY` escalators");
+        } else {
+            // less than half
+            message.push_str(&Self::nounify_escalators(escalators));
+        }
+
+        if escalators.len() == 1 {
+            message.push_str(" is ");
+        } else {
+            message.push_str(" are ");
+        }
+
+        // TODO: make this less verbose
+        let status = match status {
+            Some(Status::Open) => "`OPEN`",
+            Some(Status::Down) => "`DOWN`",
+            Some(Status::Blocked) => "`BLOCKED`",
+            None => "`UNKNOWN`",
+        };
+
+        message.push_str(status);
+        message.push('.');
+
+        message
+    }
+
+    /// Turn a collection of Escalators into a format that could be put into a message.
+    fn nounify_escalators(escalators: &[Escalator]) -> String {
+        if escalators.is_empty() {
+            return String::from("`NO` escalators");
+        }
+
+        if escalators.len() == 1 {
+            return format!("The {} escalator", Self::nounify_escalator(escalators[0]));
+        }
+
+        // how many escalators there are not including the first and last
+        let mid_count = escalators.len() - 2;
+
+        let mut escalators = escalators.iter().copied().map(Self::nounify_escalator);
+        let mut noun = format!("The {}", escalators.next().unwrap());
+
+        for escalator in escalators.by_ref().take(mid_count) {
+            noun.push_str(&format!(", {escalator}"));
+        }
+
+        noun.push_str(&format!(", and {} escalators", escalators.next().unwrap()));
+
+        noun
+    }
+
+    /// Turn an escalator into a format that could be put into a message.
+    fn nounify_escalator((start, end): Escalator) -> String {
+        format!("`{}-{}`", start, end)
+    }
+
+    fn escalators_with_status(&self, status: Option<Status>) -> Vec<Escalator> {
+        self.escalators.iter().filter_map(|(&escalator, info)| (info.status() == status).then_some(escalator)).collect()
+    }
+
+    /// Generate a summary of the statuses as an embed.
+    pub fn gist(&self) -> serenity::CreateEmbed {
+        // -- Setup
+
+        let mut embed = serenity::CreateEmbed::default();
+
+        embed.title("Here's the gist...");
+
+        // -- Handle Variations
+
+        if self.escalators.values().any(Info::is_out_of_order) {
+            // -- Some are Down/Blocked
+
+            embed.color((240, 60, 60));
+
+            // add summaries for down and blocked status escalators (only if there are any of either)
+            let summaries = [Status::Down, Status::Blocked].into_iter().filter_map(|status| {
+                let escalators = self.escalators_with_status(Some(status));
+                (!escalators.is_empty()).then(|| Self::summarize_status(Some(status), &escalators))
+            });
+
+            // annoying to have to do this to avoid possible name collisions...
+            // I just hope iter::intersperse get's stabilized soon so I can change this
+            //
+            // adds new lines between each summary for readability
+            let description: String = Itertools::intersperse(summaries, String::from("\n")).collect();
+
+            embed.description(&description);
+
+            return embed;
+        }
+
+        // -- All are Open/Unknown
+
+        let unknowns = self.escalators_with_status(None);
+
+        if unknowns.is_empty() {
+            // -- All are Open
+            let emoji = Status::Open.emoji();
+            embed.description(format!("`{emoji}` `ALL` escalators are `OPEN`! 🥳 🎉"));
+            embed.color((55, 220, 70));
+            return embed;
+        }
+
+        // -- Some are Unknown
+
+        embed.color((250, 190, 25));
+        embed.description(Self::summarize_status(None, &unknowns));
+
+        embed
     }
 
     /// Update a given escalator's status.

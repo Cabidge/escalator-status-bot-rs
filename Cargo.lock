@@ -368,6 +368,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "indexmap",
+ "itertools",
  "lazy_static",
  "poise",
  "serde",
