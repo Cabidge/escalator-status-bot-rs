@@ -14,6 +14,9 @@ impl ReportMenu {
         self.message.is_some()
     }
 
+    /// Tries to update the report menu message.
+    ///
+    /// Only returns an error if there was an error trying to edit the message.
     pub async fn update(
         &mut self,
         cache_http: impl serenity::CacheHttp,
