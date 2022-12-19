@@ -168,6 +168,20 @@ fn parse_floor(ch: char) -> Result<u8, InputError> {
     }
 }
 
+impl EscalatorInput {
+    pub fn message_noun(&self) -> String {
+        match self {
+            Self::All => String::from("`ALL` escalators"),
+            Self::Pair(a, b) => {
+                let lower = a.min(b);
+                let upper = a.max(b);
+                format!("the `{lower}-{upper}` and `{upper}-{lower}` escalators")
+            }
+            Self::Direct(lower, upper) => format!("the `{lower}-{upper}` escalator"),
+        }
+    }
+}
+
 impl From<EscalatorInput> for Vec<Escalator> {
     fn from(value: EscalatorInput) -> Self {
         match value {
