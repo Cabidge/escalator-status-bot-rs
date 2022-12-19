@@ -84,9 +84,7 @@ pub async fn handle_interaction(
 }
 
 /// Generate report button components with the proper IDs.
-pub fn report_buttons() -> serenity::CreateComponents {
-    let mut components = serenity::CreateComponents::default();
-
+pub fn add_report_buttons(components: &mut serenity::CreateComponents) -> &mut serenity::CreateComponents {
     // TODO: DRY, this is unecessarily verbose
     components.create_action_row(|row| {
         row.create_button(|btn| {
@@ -107,7 +105,5 @@ pub fn report_buttons() -> serenity::CreateComponents {
                 .style(serenity::ButtonStyle::Danger)
                 .custom_id(REPORT_BLOCKED_ID)
         })
-    });
-
-    components
+    })
 }
