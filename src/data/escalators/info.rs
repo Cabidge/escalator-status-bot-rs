@@ -47,6 +47,18 @@ impl Info {
         }
     }
 
+    pub fn is_down(&self) -> bool {
+        self.status == Some(Status::Down)
+    }
+
+    pub fn is_blocked(&self) -> bool {
+        self.status == Some(Status::Blocked)
+    }
+
+    pub fn is_out_of_order(&self) -> bool {
+        self.is_down() || self.is_blocked()
+    }
+
     fn is_outdated(&self) -> bool {
         self.status.is_none()
             || std::time::SystemTime::now()
