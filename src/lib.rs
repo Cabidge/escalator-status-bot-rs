@@ -15,6 +15,7 @@ struct EscalatorBot {
     save_task: task::JoinHandle<()>,
     announce_task: task::JoinHandle<()>,
     sync_task: task::JoinHandle<()>,
+    check_outdated_task: task::JoinHandle<()>,
 }
 
 #[shuttle_service::main]
@@ -70,12 +71,14 @@ async fn init(
     let announce_task =
         bot_tasks::announcements::begin_task(Arc::clone(&framework), updates_rx.resubscribe());
     let sync_task = bot_tasks::sync_menu::begin_task(Arc::clone(&framework), updates_rx);
+    let check_outdated_task = bot_tasks::handle_outdated::begin_task(Arc::clone(&framework));
 
     Ok(EscalatorBot {
         framework,
         save_task,
         announce_task,
         sync_task,
+        check_outdated_task,
     })
 }
 
@@ -89,6 +92,7 @@ impl shuttle_service::Service for EscalatorBot {
         self.save_task.await.map_err(anyhow::Error::from)?;
         self.announce_task.await.map_err(anyhow::Error::from)?;
         self.sync_task.await.map_err(anyhow::Error::from)?;
+        self.check_outdated_task.await.map_err(anyhow::Error::from)?;
 
         Ok(())
     }
