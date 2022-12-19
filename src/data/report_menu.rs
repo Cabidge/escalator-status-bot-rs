@@ -10,6 +10,10 @@ pub struct ReportMenu {
 }
 
 impl ReportMenu {
+    pub fn is_initialized(&self) -> bool {
+        self.message.is_some()
+    }
+
     pub async fn update<F>(
         &mut self,
         cache_http: impl serenity::CacheHttp,
@@ -25,7 +29,7 @@ impl ReportMenu {
     }
 
     pub async fn initialize(&mut self, ctx: Context<'_>) -> Result<(), Error> {
-        if self.message.is_some() {
+        if self.is_initialized() {
             ctx.send(|msg| {
                 msg.content("A report menu already exists, run `/menu clear` to delete it and clear it from memory.")
                     .ephemeral(true)
