@@ -14,7 +14,7 @@ impl ReportMenu {
         self.message.is_some()
     }
 
-    pub async fn update<F>(
+    pub async fn update(
         &mut self,
         cache_http: impl serenity::CacheHttp,
         statuses: &Statuses,
