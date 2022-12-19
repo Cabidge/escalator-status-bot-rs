@@ -92,7 +92,9 @@ impl shuttle_service::Service for EscalatorBot {
         self.save_task.await.map_err(anyhow::Error::from)?;
         self.announce_task.await.map_err(anyhow::Error::from)?;
         self.sync_task.await.map_err(anyhow::Error::from)?;
-        self.check_outdated_task.await.map_err(anyhow::Error::from)?;
+        self.check_outdated_task
+            .await
+            .map_err(anyhow::Error::from)?;
 
         Ok(())
     }
