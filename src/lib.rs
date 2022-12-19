@@ -58,7 +58,7 @@ async fn init(
 
     let save_task = bot_tasks::autosave::begin_task(Arc::clone(&framework), persist);
     let announcement_task =
-        bot_tasks::announcements::create_task(Arc::clone(&framework), updates_rx);
+        bot_tasks::announcements::begin_task(Arc::clone(&framework), updates_rx);
 
     Ok(EscalatorBot {
         framework,

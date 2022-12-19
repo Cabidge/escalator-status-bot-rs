@@ -11,7 +11,7 @@ const MIN_INTERVAL: Duration = Duration::from_secs(60);
 /// The most amount of time to wait to send the history after receiving an update.
 const MAX_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
-pub fn create_task(
+pub fn begin_task(
     framework: Arc<poise::Framework<Data, Error>>,
     mut updates: broadcast::Receiver<Update>,
 ) -> JoinHandle<()> {
