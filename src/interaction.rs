@@ -84,7 +84,9 @@ pub async fn handle_interaction(
 }
 
 /// Generate report button components with the proper IDs.
-pub fn add_report_buttons(components: &mut serenity::CreateComponents) -> &mut serenity::CreateComponents {
+pub fn add_report_buttons(
+    components: &mut serenity::CreateComponents,
+) -> &mut serenity::CreateComponents {
     // TODO: DRY, this is unecessarily verbose
     components.create_action_row(|row| {
         row.create_button(|btn| {
