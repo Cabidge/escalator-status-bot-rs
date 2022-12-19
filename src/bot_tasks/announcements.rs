@@ -17,7 +17,7 @@ pub fn create_task(
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         let data = framework.user_data().await;
-        let history_channel = Arc::clone(&data.history_channel);
+        let history_channel = &data.history_channel;
         let cache_http = Arc::clone(&framework.client().cache_and_http);
 
         let mut last_announcement = Instant::now();

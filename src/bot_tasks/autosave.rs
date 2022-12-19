@@ -13,7 +13,7 @@ pub fn begin_task(
     persist: PersistInstance,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
-        let data = framework.user_data().await.clone_arcs();
+        let data = framework.user_data().await;
         let mut interval = tokio::time::interval(AUTO_SAVE_INTERVAL);
 
         loop {
