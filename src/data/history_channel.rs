@@ -22,7 +22,10 @@ impl HistoryChannel {
         Ok(())
     }
 
-    pub fn set(&mut self, channel: serenity::Channel) -> Result<(), InvalidChannelError> {
+    pub fn set(
+        &mut self,
+        channel: serenity::Channel,
+    ) -> Result<serenity::ChannelId, InvalidChannelError> {
         let Some(channel) = channel.guild().filter(serenity::GuildChannel::is_text_based) else {
             return Err(InvalidChannelError);
         };
@@ -32,7 +35,7 @@ impl HistoryChannel {
             self.should_save = true;
         }
 
-        Ok(())
+        Ok(channel.id)
     }
 
     pub fn unset(&mut self) {
