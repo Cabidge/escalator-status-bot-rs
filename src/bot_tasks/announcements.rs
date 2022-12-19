@@ -6,10 +6,10 @@ use tokio::{sync::broadcast, task::JoinHandle, time::Instant};
 
 /// How much time to wait to send the history after receiving an update
 /// if there hasn't been one in the past MAX_INTERVAL.
-const MIN_INTERVAL: Duration = Duration::from_secs(60);
+const MIN_INTERVAL: Duration = Duration::from_secs(30);
 
 /// The most amount of time to wait to send the history after receiving an update.
-const MAX_INTERVAL: Duration = Duration::from_secs(5 * 60);
+const MAX_INTERVAL: Duration = Duration::from_secs(2 * 60);
 
 pub fn begin_task(
     framework: Arc<poise::Framework<Data, Error>>,
