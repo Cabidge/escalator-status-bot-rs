@@ -40,12 +40,7 @@ impl Data {
         let statuses = Statuses::load_persist(updates_tx, persist);
         let statuses = Arc::new(Mutex::new(statuses));
 
-        let res = ReportMenu::load_persist(context, persist).await;
-        if let Err(err) = res.as_ref() {
-            println!("{err:?}");
-        }
-
-        let report_menu = res.unwrap_or_default();
+        let report_menu = ReportMenu::load_persist(context, persist).await.unwrap_or_default();
         let report_menu = Arc::new(Mutex::new(report_menu));
 
         let history_channel = HistoryChannel::load_persist(persist).unwrap_or_default();
