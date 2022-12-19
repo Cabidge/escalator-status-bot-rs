@@ -10,7 +10,7 @@ const AUTO_SAVE_INTERVAL: Duration = Duration::from_secs(15 * 60);
 
 pub fn begin_task(
     framework: Arc<poise::Framework<Data, Error>>,
-    persist: PersistInstance,
+    persist: Arc<PersistInstance>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         let data = framework.user_data().await;
