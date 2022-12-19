@@ -45,7 +45,7 @@ pub enum Update {
         escalators: EscalatorInput,
         status: Status,
     },
-    Unknown(Escalator),
+    Outdated(Escalator),
 }
 
 type Escalators = IndexMap<Escalator, Info>;
@@ -262,7 +262,7 @@ impl Statuses {
         for (escalator, info) in self.escalators.iter_mut() {
             if info.handle_outdated() {
                 // TODO: log error
-                let _ = self.updates.send(Update::Unknown(*escalator)).ok();
+                let _ = self.updates.send(Update::Outdated(*escalator)).ok();
                 self.should_save = true;
             }
         }
