@@ -44,6 +44,7 @@ pub enum Update {
     Report {
         escalators: EscalatorInput,
         status: Status,
+        reporter: Option<serenity::UserId>,
     },
     Outdated(Escalator),
 }
@@ -183,7 +184,10 @@ impl Statuses {
     }
 
     fn escalators_with_status(&self, status: Option<Status>) -> Vec<Escalator> {
-        self.escalators.iter().filter_map(|(&escalator, info)| (info.status() == status).then_some(escalator)).collect()
+        self.escalators
+            .iter()
+            .filter_map(|(&escalator, info)| (info.status() == status).then_some(escalator))
+            .collect()
     }
 
     /// Generate a summary of the statuses as an embed.
@@ -202,16 +206,20 @@ impl Statuses {
             embed.color((240, 60, 60));
 
             // add summaries for down and blocked status escalators (only if there are any of either)
-            let summaries = [Status::Down, Status::Blocked].into_iter().filter_map(|status| {
-                let escalators = self.escalators_with_status(Some(status));
-                (!escalators.is_empty()).then(|| Self::summarize_status(Some(status), &escalators))
-            });
+            let summaries = [Status::Down, Status::Blocked]
+                .into_iter()
+                .filter_map(|status| {
+                    let escalators = self.escalators_with_status(Some(status));
+                    (!escalators.is_empty())
+                        .then(|| Self::summarize_status(Some(status), &escalators))
+                });
 
             // annoying to have to do this to avoid possible name collisions...
             // I just hope iter::intersperse get's stabilized soon so I can change this
             //
             // adds new lines between each summary for readability
-            let description: String = Itertools::intersperse(summaries, String::from("\n")).collect();
+            let description: String =
+                Itertools::intersperse(summaries, String::from("\n")).collect();
 
             embed.description(&description);
 
@@ -239,7 +247,12 @@ impl Statuses {
     }
 
     /// Update a given escalator's status.
-    pub fn report(&mut self, escalators: EscalatorInput, status: Status) {
+    pub fn report(
+        &mut self,
+        escalators: EscalatorInput,
+        status: Status,
+        reporter: Option<serenity::UserId>,
+    ) {
         let mut any_updated = false;
         // for each reported escalator, check if any of them successfully updated
         for escalator in Vec::<_>::from(escalators) {
@@ -250,7 +263,11 @@ impl Statuses {
 
         if any_updated {
             // TODO: log error
-            let update = Update::Report { escalators, status };
+            let update = Update::Report {
+                escalators,
+                status,
+                reporter,
+            };
             let _ = self.updates.send(update).ok();
             self.should_save = true;
         }

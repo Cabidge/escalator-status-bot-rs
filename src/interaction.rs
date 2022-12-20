@@ -65,7 +65,11 @@ pub async fn handle_interaction(
         }
     };
 
-    data.statuses.lock().await.report(escalators, status);
+    let reporter = interaction.member.as_ref().map(|member| member.user.id);
+    data.statuses
+        .lock()
+        .await
+        .report(escalators, status, reporter);
 
     let message = format!(
         "You've successfully reported {} as `{}`",
