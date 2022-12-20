@@ -1,7 +1,11 @@
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashSet, fmt::Display, sync::Arc, time::Duration};
 
-use crate::{data::Update, prelude::*};
+use crate::{
+    data::{status::Status, EscalatorInput, Statuses, Update, UNKNOWN_STATUS_EMOJI},
+    prelude::*,
+};
 
+use itertools::{Either, Itertools};
 use tokio::{sync::broadcast, task::JoinHandle, time::Instant};
 
 /// How much time to wait to send the history after receiving an update
@@ -11,6 +15,12 @@ const MIN_INTERVAL: Duration = Duration::from_secs(30);
 /// The most amount of time to wait to send the history after receiving an update.
 const MAX_INTERVAL: Duration = Duration::from_secs(2 * 60);
 
+struct Report {
+    escalators: EscalatorInput,
+    status: Status,
+    reporter: Option<serenity::UserId>,
+}
+
 pub fn begin_task(
     framework: Arc<poise::Framework<Data, Error>>,
     mut updates: broadcast::Receiver<Update>,
@@ -19,10 +29,13 @@ pub fn begin_task(
 
     tokio::spawn(async move {
         let data = framework.user_data().await;
+        let statuses = &data.statuses;
         let history_channel = &data.history_channel;
 
         let mut last_announcement = Instant::now();
 
+        // it might be a good idea to add a check to see if there is a history
+        // channel set, so it doesn't do all of this work if it doesn't need to.
         loop {
             // wait until an update is received
             let first_update = match updates.recv().await {
@@ -58,13 +71,67 @@ pub fn begin_task(
                 }
             }
 
-            // TODO: format announcement
-            if let Err(err) = history_channel
+            // get summary of the current escalator statuses
+            let mut embed = statuses.lock().await.gist();
+
+            // separate the user reports from the status decays
+            let (reports, outdated): (Vec<_>, Vec<_>) =
+                history.into_iter().partition_map(partition_update);
+
+            // collect all reported escalators into a set
+            let reported_escalators = reports
+                .iter()
+                .map(|report| report.escalators)
+                .flat_map(Vec::from)
+                .collect::<HashSet<_>>();
+
+            // filter out outdated statuses that have recently been reported
+            let outdated = outdated
+                .into_iter()
+                .filter(|escalator| !reported_escalators.contains(escalator))
+                .sorted()
+                .collect::<Vec<_>>();
+
+            // add report history
+            if !reports.is_empty() {
+                let message = format_reports(reports.into_iter().rev());
+                embed.field("Recent reports (newest first)", message, false);
+            }
+
+            // add outdated
+            if !outdated.is_empty() {
+                fn make_ascii_titlecase(s: &mut str) {
+                    if let Some(r) = s.get_mut(0..1) {
+                        r.make_ascii_uppercase();
+                    }
+                }
+
+                let mut escalators = Statuses::nounify_escalators(&outdated);
+                make_ascii_titlecase(&mut escalators);
+
+                let mut message = format!("`{}` {}", UNKNOWN_STATUS_EMOJI, escalators);
+
+                if outdated.len() == 1 {
+                    message.push_str(" has ");
+                } else {
+                    message.push_str(" have ");
+                }
+
+                message.push_str("been marked as `UNKNOWN` due to infrequent reports.");
+
+                embed.field("Outdated", message, false);
+            }
+
+            // send embed to history channel
+            let res = history_channel
                 .read()
                 .await
-                .send(&cache_http.http, |msg| msg.content(format!("{history:#?}")))
-                .await
-            {
+                .send(&cache_http.http, move |msg| {
+                    msg.embed(replace_builder_with(embed))
+                })
+                .await;
+
+            if let Err(err) = res {
                 // TODO: handle error
                 println!("{err:?}");
             }
@@ -72,4 +139,58 @@ pub fn begin_task(
             last_announcement = Instant::now();
         }
     })
+}
+
+const MAX_REPORTS_DISPLAYED: usize = 14;
+
+fn format_reports<I>(reports: I) -> String
+where
+    I: Iterator<Item = Report> + ExactSizeIterator,
+{
+    let mut reports = reports.map(|report| report.to_string());
+
+    if reports.len() <= MAX_REPORTS_DISPLAYED {
+        return Itertools::intersperse(reports, String::from("\n")).collect();
+    }
+
+    let mut message = String::new();
+    for report in reports.by_ref().take(MAX_REPORTS_DISPLAYED - 1) {
+        message.push_str(&report);
+        message.push('\n');
+    }
+
+    message.push_str(&format!("\n*(...and {} more)*", reports.len()));
+
+    message
+}
+
+fn partition_update(update: Update) -> Either<Report, (u8, u8)> {
+    match update {
+        Update::Report {
+            escalators,
+            status,
+            reporter,
+        } => Either::Left(Report {
+            escalators,
+            status,
+            reporter,
+        }),
+        Update::Outdated(escalator) => Either::Right(escalator),
+    }
+}
+
+impl Display for Report {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let emoji = self.status.emoji();
+        let reporter = self
+            .reporter
+            .map(|id| format!("<@{}>", id))
+            .unwrap_or_else(|| String::from("an unknown user"));
+
+        write!(
+            f,
+            "`{emoji}` {reporter} reported {}.",
+            self.escalators.message_noun()
+        )
+    }
 }
