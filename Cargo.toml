@@ -16,3 +16,6 @@ shuttle-persist = "0.8.0"
 shuttle-secrets = "0.8.0"
 shuttle-service = "0.8.0"
 tokio = { version = "1", features = ["full"] }
+
+[patch.crates-io]
+dashmap = { git = "https://github.com/snylonue/dashmap", branch = "no-toolchain" }
