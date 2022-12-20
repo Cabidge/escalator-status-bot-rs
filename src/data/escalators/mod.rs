@@ -1,5 +1,7 @@
 mod info;
 
+pub use self::info::UNKNOWN_STATUS_EMOJI;
+
 use crate::prelude::*;
 
 use indexmap::IndexMap;
@@ -7,8 +9,6 @@ use itertools::Itertools;
 use shuttle_persist::PersistInstance;
 use std::{fmt::Display, str::FromStr};
 use tokio::sync::broadcast;
-
-use self::info::UNKNOWN_STATUS_EMOJI;
 
 use super::status::Status;
 use info::Info;
