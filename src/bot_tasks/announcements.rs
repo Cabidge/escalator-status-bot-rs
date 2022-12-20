@@ -131,9 +131,13 @@ pub fn begin_task(
                 })
                 .await;
 
-            if let Err(err) = res {
+            match res {
+                Ok(Some(msg)) => {
+                    let _ = msg.crosspost(&cache_http).await.ok();
+                }
+                Ok(None) => (),
                 // TODO: handle error
-                println!("{err:?}");
+                Err(err) => println!("{err:?}"),
             }
 
             last_announcement = Instant::now();

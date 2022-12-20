@@ -11,15 +11,17 @@ pub struct HistoryChannel {
 pub struct InvalidChannelError;
 
 impl HistoryChannel {
-    pub async fn send<F>(&self, http: impl AsRef<serenity::Http>, f: F) -> Result<(), Error>
+    pub async fn send<F>(
+        &self,
+        http: impl AsRef<serenity::Http>,
+        f: F,
+    ) -> Result<Option<serenity::Message>, Error>
     where
         for<'a, 'b> F:
             FnOnce(&'b mut serenity::CreateMessage<'a>) -> &'b mut serenity::CreateMessage<'a>,
     {
-        let Some(channel) = &self.channel else { return Ok(()) };
-        channel.send_message(http, f).await?;
-
-        Ok(())
+        let Some(channel) = &self.channel else { return Ok(None) };
+        Ok(Some(channel.send_message(http, f).await?))
     }
 
     pub fn set(
