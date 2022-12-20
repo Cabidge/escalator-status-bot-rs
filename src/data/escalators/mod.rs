@@ -154,7 +154,7 @@ impl Statuses {
     }
 
     /// Turn a collection of Escalators into a format that could be put into a message.
-    fn nounify_escalators(escalators: &[Escalator]) -> String {
+    pub fn nounify_escalators(escalators: &[Escalator]) -> String {
         if escalators.is_empty() {
             return String::from("`NO` escalators");
         }
