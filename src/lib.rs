@@ -89,12 +89,12 @@ impl shuttle_service::Service for EscalatorBot {
         _addr: std::net::SocketAddr,
     ) -> Result<(), shuttle_service::error::Error> {
         self.framework.start().await.map_err(anyhow::Error::from)?;
-        self.save_task.await.map_err(anyhow::Error::from)?;
-        self.announce_task.await.map_err(anyhow::Error::from)?;
-        self.sync_task.await.map_err(anyhow::Error::from)?;
-        self.check_outdated_task
-            .await
-            .map_err(anyhow::Error::from)?;
+
+        // abort all bot tasks once client stops
+        self.save_task.abort();
+        self.announce_task.abort();
+        self.sync_task.abort();
+        self.check_outdated_task.abort();
 
         Ok(())
     }
