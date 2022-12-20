@@ -27,7 +27,8 @@ async fn gist(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;
 
     let gist = ctx.data().statuses.lock().await.gist();
-    ctx.send(move |msg| msg.embed(replace_builder_with(gist))).await?;
+    ctx.send(move |msg| msg.embed(replace_builder_with(gist)))
+        .await?;
 
     Ok(())
 }
