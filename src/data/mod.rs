@@ -15,6 +15,7 @@ use tokio::sync::{broadcast, Mutex, RwLock};
 
 #[derive(Debug)]
 pub struct Data {
+    pub shard_manager: Arc<Mutex<serenity::ShardManager>>,
     pub statuses: Arc<Mutex<Statuses>>,
     pub report_menu: Arc<Mutex<ReportMenu>>,
     pub history_channel: Arc<RwLock<HistoryChannel>>,
@@ -25,11 +26,13 @@ impl Data {
     ///
     /// Not deriving Clone for Data because this is more explicit.
     pub fn clone_arcs(&self) -> Data {
+        let shard_manager = Arc::clone(&self.shard_manager);
         let statuses = Arc::clone(&self.statuses);
         let report_menu = Arc::clone(&self.report_menu);
         let history_channel = Arc::clone(&self.history_channel);
 
         Data {
+            shard_manager,
             statuses,
             report_menu,
             history_channel,
@@ -37,6 +40,7 @@ impl Data {
     }
 
     pub async fn load_persist(
+        shard_manager: Arc<Mutex<serenity::ShardManager>>,
         context: &serenity::Context,
         updates_tx: broadcast::Sender<Update>,
         persist: &PersistInstance,
@@ -53,6 +57,7 @@ impl Data {
         let history_channel = Arc::new(RwLock::new(history_channel));
 
         Data {
+            shard_manager,
             statuses,
             report_menu,
             history_channel,

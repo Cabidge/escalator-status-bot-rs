@@ -53,13 +53,15 @@ async fn init(
         })
         .token(token)
         .intents(serenity::GatewayIntents::non_privileged())
-        .setup(move |ctx, _ready, _framework| {
+        .setup(move |ctx, _ready, framework| {
             // set up bot data
             let persist = cloned_persist;
             println!("Bot is ready");
 
+            let shard_manager = Arc::clone(framework.shard_manager());
+
             Box::pin(async move {
-                let data = Data::load_persist(ctx, updates_tx, &persist).await;
+                let data = Data::load_persist(shard_manager, ctx, updates_tx, &persist).await;
                 Ok(data)
             })
         })
