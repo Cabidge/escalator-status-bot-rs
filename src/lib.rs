@@ -4,6 +4,10 @@ pub mod data;
 pub mod prelude;
 pub mod report_modal;
 
+use bot_tasks::{
+    announcements::AnnouncementTask, autosave::AutoSaveTask, forward_reports::ForwardReportTask,
+    handle_outdated::HandleOutdatedTask, sync_menu::SyncMenuTask, BotTask,
+};
 use std::sync::Arc;
 use tokio::{
     sync::{broadcast, mpsc},
@@ -14,11 +18,7 @@ use prelude::*;
 
 struct EscalatorBot {
     framework: Arc<poise::Framework<Data, Error>>,
-    save_task: task::JoinHandle<()>,
-    announce_task: task::JoinHandle<()>,
-    sync_task: task::JoinHandle<()>,
-    forward_report_task: task::JoinHandle<()>,
-    check_outdated_task: task::JoinHandle<()>,
+    tasks: Vec<task::JoinHandle<()>>,
 }
 
 #[shuttle_service::main]
@@ -65,22 +65,28 @@ async fn init(
         .await
         .map_err(anyhow::Error::new)?;
 
-    let save_task = bot_tasks::autosave::begin_task(Arc::clone(&framework), persist);
-    let announce_task =
-        bot_tasks::announcements::begin_task(Arc::clone(&framework), updates_rx.resubscribe());
-    let sync_task = bot_tasks::sync_menu::begin_task(Arc::clone(&framework), updates_rx);
-    let forward_report_task =
-        bot_tasks::forward_reports::begin_task(Arc::clone(&framework), user_reports_rx);
-    let check_outdated_task = bot_tasks::handle_outdated::begin_task(Arc::clone(&framework));
+    let bot = EscalatorBot::new(framework)
+        .add_task(AutoSaveTask(persist))
+        .add_task(AnnouncementTask(updates_rx.resubscribe()))
+        .add_task(SyncMenuTask(updates_rx))
+        .add_task(ForwardReportTask(user_reports_rx))
+        .add_task(HandleOutdatedTask);
 
-    Ok(EscalatorBot {
-        framework,
-        save_task,
-        announce_task,
-        sync_task,
-        forward_report_task,
-        check_outdated_task,
-    })
+    Ok(bot)
+}
+
+impl EscalatorBot {
+    fn new(framework: Arc<poise::Framework<Data, Error>>) -> Self {
+        Self {
+            framework,
+            tasks: vec![],
+        }
+    }
+
+    fn add_task<T: BotTask>(mut self, task: T) -> Self {
+        self.tasks.push(task.begin(Arc::clone(&self.framework)));
+        self
+    }
 }
 
 #[shuttle_service::async_trait]
@@ -92,11 +98,9 @@ impl shuttle_service::Service for EscalatorBot {
         self.framework.start().await.map_err(anyhow::Error::from)?;
 
         // abort all bot tasks once client stops
-        self.save_task.abort();
-        self.announce_task.abort();
-        self.sync_task.abort();
-        self.forward_report_task.abort();
-        self.check_outdated_task.abort();
+        for task in self.tasks {
+            task.abort();
+        }
 
         Ok(())
     }

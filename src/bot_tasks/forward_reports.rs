@@ -6,15 +6,18 @@ use tokio::task::JoinHandle;
 use crate::data::UserReport;
 use crate::prelude::*;
 
-pub fn begin_task(
-    framework: Arc<poise::Framework<Data, Error>>,
-    mut user_reports_rx: mpsc::Receiver<UserReport>,
-) -> JoinHandle<()> {
-    tokio::spawn(async move {
-        let data = framework.user_data().await;
+use super::BotTask;
 
-        while let Some(report) = user_reports_rx.recv().await {
-            data.statuses.lock().await.report(report);
-        }
-    })
+pub struct ForwardReportTask(pub mpsc::Receiver<UserReport>);
+
+impl BotTask for ForwardReportTask {
+    fn begin(mut self, framework: Arc<poise::Framework<Data, Error>>) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            let data = framework.user_data().await;
+
+            while let Some(report) = self.0.recv().await {
+                data.statuses.lock().await.report(report);
+            }
+        })
+    }
 }
