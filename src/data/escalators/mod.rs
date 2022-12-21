@@ -10,7 +10,7 @@ use shuttle_persist::PersistInstance;
 use std::{fmt::Display, str::FromStr};
 use tokio::sync::broadcast;
 
-use super::status::Status;
+use super::{status::Status, UserReport};
 use info::Info;
 
 pub const ESCALATORS: [Escalator; 14] = [
@@ -41,11 +41,7 @@ pub struct Statuses {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Update {
-    Report {
-        escalators: EscalatorInput,
-        status: Status,
-        reporter: Option<serenity::UserId>,
-    },
+    Report(UserReport),
     Outdated(Escalator),
 }
 
@@ -247,28 +243,18 @@ impl Statuses {
     }
 
     /// Update a given escalator's status.
-    pub fn report(
-        &mut self,
-        escalators: EscalatorInput,
-        status: Status,
-        reporter: Option<serenity::UserId>,
-    ) {
+    pub fn report(&mut self, report: UserReport) {
         let mut any_updated = false;
         // for each reported escalator, check if any of them successfully updated
-        for escalator in Vec::<_>::from(escalators) {
+        for escalator in Vec::<_>::from(report.escalators) {
             if let Some(info) = self.escalators.get_mut(&escalator) {
-                any_updated |= info.update_status(status);
+                any_updated |= info.update_status(report.status);
             }
         }
 
         if any_updated {
             // TODO: log error
-            let update = Update::Report {
-                escalators,
-                status,
-                reporter,
-            };
-            let _ = self.updates.send(update).ok();
+            let _ = self.updates.send(Update::Report(report)).ok();
             self.should_save = true;
         }
     }

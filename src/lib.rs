@@ -1,12 +1,11 @@
 pub mod bot_tasks;
 pub mod commands;
 pub mod data;
-pub mod interaction;
 pub mod prelude;
 pub mod report_modal;
 
 use std::sync::Arc;
-use tokio::{sync::broadcast, task};
+use tokio::{sync::{broadcast, mpsc}, task};
 
 use prelude::*;
 
@@ -15,6 +14,7 @@ struct EscalatorBot {
     save_task: task::JoinHandle<()>,
     announce_task: task::JoinHandle<()>,
     sync_task: task::JoinHandle<()>,
+    forward_report_task: task::JoinHandle<()>,
     check_outdated_task: task::JoinHandle<()>,
 }
 
@@ -31,6 +31,7 @@ async fn init(
     let persist = Arc::new(persist);
 
     let (updates_tx, updates_rx) = broadcast::channel(32);
+    let (user_reports_tx, user_reports_rx) = mpsc::channel(2);
 
     let cloned_persist = Arc::clone(&persist);
 
@@ -39,16 +40,6 @@ async fn init(
         .options(poise::FrameworkOptions {
             // add bot commands
             commands: commands::commands(),
-            event_handler: |ctx, event, _framework, data| {
-                Box::pin(async move {
-                    // handle component interactions
-                    if let poise::Event::InteractionCreate { interaction } = event {
-                        interaction::handle_interaction(ctx, interaction, data).await?;
-                    }
-
-                    Ok(())
-                })
-            },
             ..Default::default()
         })
         .token(token)
@@ -61,7 +52,7 @@ async fn init(
             let shard_manager = Arc::clone(framework.shard_manager());
 
             Box::pin(async move {
-                let data = Data::load_persist(shard_manager, ctx, updates_tx, &persist).await;
+                let data = Data::load_persist(shard_manager, ctx, user_reports_tx, updates_tx, &persist).await;
                 Ok(data)
             })
         })
@@ -73,6 +64,7 @@ async fn init(
     let announce_task =
         bot_tasks::announcements::begin_task(Arc::clone(&framework), updates_rx.resubscribe());
     let sync_task = bot_tasks::sync_menu::begin_task(Arc::clone(&framework), updates_rx);
+    let forward_report_task = bot_tasks::forward_reports::begin_task(Arc::clone(&framework), user_reports_rx);
     let check_outdated_task = bot_tasks::handle_outdated::begin_task(Arc::clone(&framework));
 
     Ok(EscalatorBot {
@@ -80,6 +72,7 @@ async fn init(
         save_task,
         announce_task,
         sync_task,
+        forward_report_task,
         check_outdated_task,
     })
 }
@@ -96,6 +89,7 @@ impl shuttle_service::Service for EscalatorBot {
         self.save_task.abort();
         self.announce_task.abort();
         self.sync_task.abort();
+        self.forward_report_task.abort();
         self.check_outdated_task.abort();
 
         Ok(())

@@ -10,8 +10,10 @@ pub use report_menu::ReportMenu;
 use crate::prelude::*;
 
 use shuttle_persist::PersistInstance;
-use std::sync::Arc;
-use tokio::sync::{broadcast, Mutex, RwLock};
+use std::{sync::Arc, fmt::Display};
+use tokio::sync::{broadcast, Mutex, RwLock, mpsc};
+
+use self::status::Status;
 
 #[derive(Debug)]
 pub struct Data {
@@ -19,6 +21,13 @@ pub struct Data {
     pub statuses: Arc<Mutex<Statuses>>,
     pub report_menu: Arc<Mutex<ReportMenu>>,
     pub history_channel: Arc<RwLock<HistoryChannel>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct UserReport {
+    pub escalators: EscalatorInput,
+    pub status: Status,
+    pub reporter: Option<serenity::UserId>,
 }
 
 impl Data {
@@ -41,16 +50,15 @@ impl Data {
 
     pub async fn load_persist(
         shard_manager: Arc<Mutex<serenity::ShardManager>>,
-        context: &serenity::Context,
+        ctx: &serenity::Context,
+        user_reports_tx: mpsc::Sender<UserReport>,
         updates_tx: broadcast::Sender<Update>,
         persist: &PersistInstance,
     ) -> Self {
         let statuses = Statuses::load_persist(updates_tx, persist);
         let statuses = Arc::new(Mutex::new(statuses));
 
-        let report_menu = ReportMenu::load_persist(context, persist)
-            .await
-            .unwrap_or_default();
+        let report_menu = ReportMenu::load_persist(user_reports_tx, ctx, persist).await;
         let report_menu = Arc::new(Mutex::new(report_menu));
 
         let history_channel = HistoryChannel::load_persist(persist).unwrap_or_default();
@@ -68,5 +76,21 @@ impl Data {
         self.statuses.lock().await.save_persist(persist);
         self.report_menu.lock().await.save_persist(persist);
         self.history_channel.write().await.save_persist(persist);
+    }
+}
+
+impl Display for UserReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let emoji = self.status.emoji();
+        let reporter = self
+            .reporter
+            .map(|id| format!("<@{}>", id))
+            .unwrap_or_else(|| String::from("an unknown user"));
+
+        write!(
+            f,
+            "`{emoji}` {reporter} reported {}.",
+            self.escalators.message_noun()
+        )
     }
 }

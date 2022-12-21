@@ -1,7 +1,7 @@
-use std::{collections::HashSet, fmt::Display, sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use crate::{
-    data::{status::Status, EscalatorInput, Statuses, Update, UNKNOWN_STATUS_EMOJI},
+    data::{Statuses, Update, UNKNOWN_STATUS_EMOJI, UserReport},
     prelude::*,
 };
 
@@ -14,12 +14,6 @@ const MIN_INTERVAL: Duration = Duration::from_secs(30);
 
 /// The most amount of time to wait to send the history after receiving an update.
 const MAX_INTERVAL: Duration = Duration::from_secs(2 * 60);
-
-struct Report {
-    escalators: EscalatorInput,
-    status: Status,
-    reporter: Option<serenity::UserId>,
-}
 
 pub fn begin_task(
     framework: Arc<poise::Framework<Data, Error>>,
@@ -149,7 +143,7 @@ const MAX_REPORTS_DISPLAYED: usize = 14;
 
 fn format_reports<I>(reports: I) -> String
 where
-    I: Iterator<Item = Report> + ExactSizeIterator,
+    I: Iterator<Item = UserReport> + ExactSizeIterator,
 {
     let mut reports = reports.map(|report| report.to_string());
 
@@ -168,33 +162,9 @@ where
     message
 }
 
-fn partition_update(update: Update) -> Either<Report, (u8, u8)> {
+fn partition_update(update: Update) -> Either<UserReport, (u8, u8)> {
     match update {
-        Update::Report {
-            escalators,
-            status,
-            reporter,
-        } => Either::Left(Report {
-            escalators,
-            status,
-            reporter,
-        }),
+        Update::Report(report)=> Either::Left(report),
         Update::Outdated(escalator) => Either::Right(escalator),
-    }
-}
-
-impl Display for Report {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let emoji = self.status.emoji();
-        let reporter = self
-            .reporter
-            .map(|id| format!("<@{}>", id))
-            .unwrap_or_else(|| String::from("an unknown user"));
-
-        write!(
-            f,
-            "`{emoji}` {reporter} reported {}.",
-            self.escalators.message_noun()
-        )
     }
 }
