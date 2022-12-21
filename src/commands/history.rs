@@ -10,7 +10,7 @@ async fn set(ctx: Context<'_>, channel: serenity::Channel) -> Result<(), Error> 
     ctx.defer_ephemeral().await?;
 
     let msg = match ctx.data().history_channel.write().await.set(channel) {
-        Ok(id) => format!("Successfully set the history to {id}."),
+        Ok(id) => format!("Successfully set the history to <#{id}>."),
         Err(InvalidChannelError) => String::from("Expected a text-based guild channel."),
     };
 
