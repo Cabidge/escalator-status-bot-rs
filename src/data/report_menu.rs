@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use crate::{prelude::*, report_modal::ReportModal};
 
-use super::{status::Status, EscalatorInput, Statuses, UserReport};
+use super::{escalator_input::EscalatorInput, status::Status, Statuses, UserReport};
 
 use poise::{futures_util::StreamExt, Modal};
 use shuttle_persist::PersistInstance;

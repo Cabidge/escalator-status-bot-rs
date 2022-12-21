@@ -1,3 +1,4 @@
+pub mod escalator_input;
 pub mod escalators;
 pub mod history_channel;
 pub mod report_menu;
@@ -13,7 +14,7 @@ use shuttle_persist::PersistInstance;
 use std::{fmt::Display, sync::Arc};
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 
-use self::status::Status;
+use self::{escalator_input::EscalatorInput, status::Status};
 
 #[derive(Debug)]
 pub struct Data {

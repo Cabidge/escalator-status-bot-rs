@@ -1,4 +1,4 @@
-use crate::data::{EscalatorInput, InputError};
+use crate::data::escalator_input::{EscalatorInput, InputError};
 
 #[derive(Debug, poise::Modal)]
 #[name = "Report an Escalator"]
