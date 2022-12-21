@@ -5,7 +5,10 @@ pub mod prelude;
 pub mod report_modal;
 
 use std::sync::Arc;
-use tokio::{sync::{broadcast, mpsc}, task};
+use tokio::{
+    sync::{broadcast, mpsc},
+    task,
+};
 
 use prelude::*;
 
@@ -52,7 +55,9 @@ async fn init(
             let shard_manager = Arc::clone(framework.shard_manager());
 
             Box::pin(async move {
-                let data = Data::load_persist(shard_manager, ctx, user_reports_tx, updates_tx, &persist).await;
+                let data =
+                    Data::load_persist(shard_manager, ctx, user_reports_tx, updates_tx, &persist)
+                        .await;
                 Ok(data)
             })
         })
@@ -64,7 +69,8 @@ async fn init(
     let announce_task =
         bot_tasks::announcements::begin_task(Arc::clone(&framework), updates_rx.resubscribe());
     let sync_task = bot_tasks::sync_menu::begin_task(Arc::clone(&framework), updates_rx);
-    let forward_report_task = bot_tasks::forward_reports::begin_task(Arc::clone(&framework), user_reports_rx);
+    let forward_report_task =
+        bot_tasks::forward_reports::begin_task(Arc::clone(&framework), user_reports_rx);
     let check_outdated_task = bot_tasks::handle_outdated::begin_task(Arc::clone(&framework));
 
     Ok(EscalatorBot {

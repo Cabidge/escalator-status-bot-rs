@@ -2,11 +2,11 @@ use std::{sync::Arc, time::Duration};
 
 use crate::{prelude::*, report_modal::ReportModal};
 
-use super::{Statuses, UserReport, status::Status, EscalatorInput};
+use super::{status::Status, EscalatorInput, Statuses, UserReport};
 
 use poise::{futures_util::StreamExt, Modal};
 use shuttle_persist::PersistInstance;
-use tokio::{task, sync::mpsc};
+use tokio::{sync::mpsc, task};
 
 #[derive(Debug)]
 pub struct ReportMenu {
@@ -26,7 +26,7 @@ impl ReportMenu {
     pub async fn load_persist(
         user_reports: mpsc::Sender<UserReport>,
         ctx: &serenity::Context,
-        persist: &PersistInstance
+        persist: &PersistInstance,
     ) -> Self {
         let Ok(ids) = persist.load::<Option<(u64, u64)>>("report_menu") else {
             return Self::new(ctx.shard.clone(), user_reports, true);
@@ -53,10 +53,7 @@ impl ReportMenu {
 
     pub fn save_persist(&mut self, persist: &PersistInstance) {
         if self.should_save {
-            let ids = self
-                .menu
-                .as_ref()
-                .map(MenuHandle::ids);
+            let ids = self.menu.as_ref().map(MenuHandle::ids);
 
             let _ = persist.save("report_menu", ids).ok();
 
@@ -64,7 +61,11 @@ impl ReportMenu {
         }
     }
 
-    fn new(shard_messenger: serenity::ShardMessenger, user_reports: mpsc::Sender<UserReport>, should_save: bool) -> Self {
+    fn new(
+        shard_messenger: serenity::ShardMessenger,
+        user_reports: mpsc::Sender<UserReport>,
+        should_save: bool,
+    ) -> Self {
         Self {
             menu: None,
             shard_messenger,
@@ -140,7 +141,9 @@ impl ReportMenu {
     }
 
     fn create_handle(&self, http: Arc<serenity::Http>, message: serenity::Message) -> MenuHandle {
-        let mut collector = message.await_component_interactions(&self.shard_messenger).build();
+        let mut collector = message
+            .await_component_interactions(&self.shard_messenger)
+            .build();
         let user_reports = self.user_reports.downgrade();
         let shard = self.shard_messenger.clone();
 
@@ -151,7 +154,9 @@ impl ReportMenu {
                 };
 
                 // TODO: log error
-                if let Err(err) = handle_interaction(&interaction, user_reports, &http, &shard).await {
+                if let Err(err) =
+                    handle_interaction(&interaction, user_reports, &http, &shard).await
+                {
                     println!("{err:?}");
                 }
             }
@@ -170,7 +175,11 @@ impl MenuHandle {
         let _ = self.message.delete(cache_http).await.ok();
     }
 
-    async fn update_message(&mut self, cache_http: impl serenity::CacheHttp, content: &str) -> Result<(), Error> {
+    async fn update_message(
+        &mut self,
+        cache_http: impl serenity::CacheHttp,
+        content: &str,
+    ) -> Result<(), Error> {
         self.message
             .edit(cache_http, |msg| msg.content(content))
             .await?;
@@ -228,9 +237,7 @@ async fn handle_interaction(
         Ok(e) => e,
         Err(err) => {
             interaction
-                .create_followup_message(http, |msg| {
-                    msg.content(err.to_string()).ephemeral(true)
-                })
+                .create_followup_message(http, |msg| msg.content(err.to_string()).ephemeral(true))
                 .await?;
 
             return Ok(());
@@ -238,8 +245,12 @@ async fn handle_interaction(
     };
 
     let reporter = interaction.member.as_ref().map(|member| member.user.id);
-    
-    let report = UserReport { escalators, status, reporter };
+
+    let report = UserReport {
+        escalators,
+        status,
+        reporter,
+    };
     user_reports.send(report).await?;
 
     let message = format!(

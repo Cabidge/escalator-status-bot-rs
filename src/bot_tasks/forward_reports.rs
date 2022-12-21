@@ -3,10 +3,13 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
-use crate::prelude::*;
 use crate::data::UserReport;
+use crate::prelude::*;
 
-pub fn begin_task(framework: Arc<poise::Framework<Data, Error>>, mut user_reports_rx: mpsc::Receiver<UserReport>) -> JoinHandle<()> {
+pub fn begin_task(
+    framework: Arc<poise::Framework<Data, Error>>,
+    mut user_reports_rx: mpsc::Receiver<UserReport>,
+) -> JoinHandle<()> {
     tokio::spawn(async move {
         let data = framework.user_data().await;
 

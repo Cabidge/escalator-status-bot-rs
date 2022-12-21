@@ -1,7 +1,7 @@
 use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use crate::{
-    data::{Statuses, Update, UNKNOWN_STATUS_EMOJI, UserReport},
+    data::{Statuses, Update, UserReport, UNKNOWN_STATUS_EMOJI},
     prelude::*,
 };
 
@@ -164,7 +164,7 @@ where
 
 fn partition_update(update: Update) -> Either<UserReport, (u8, u8)> {
     match update {
-        Update::Report(report)=> Either::Left(report),
+        Update::Report(report) => Either::Left(report),
         Update::Outdated(escalator) => Either::Right(escalator),
     }
 }

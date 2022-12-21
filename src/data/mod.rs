@@ -10,8 +10,8 @@ pub use report_menu::ReportMenu;
 use crate::prelude::*;
 
 use shuttle_persist::PersistInstance;
-use std::{sync::Arc, fmt::Display};
-use tokio::sync::{broadcast, Mutex, RwLock, mpsc};
+use std::{fmt::Display, sync::Arc};
+use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 
 use self::status::Status;
 

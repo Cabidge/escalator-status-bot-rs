@@ -5,7 +5,14 @@ use crate::prelude::*;
 
 /// Returns a vector containing all enabled bot commands.
 pub fn commands() -> Vec<poise::Command<crate::Data, Error>> {
-    vec![register(), ping(), menu::menu(), history::history(), gist(), kill()]
+    vec![
+        register(),
+        ping(),
+        menu::menu(),
+        history::history(),
+        gist(),
+        kill(),
+    ]
 }
 
 /// Spawns a button panel to register application commands (dev-only).
