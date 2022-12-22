@@ -36,6 +36,18 @@ impl EscalatorInput {
             Self::Direct(lower, upper) => format!("the `{lower}-{upper}` escalator"),
         }
     }
+
+    pub fn short_noun(&self) -> String {
+        match self {
+            Self::All => String::from("ALL escalators"),
+            Self::Pair(a, b) => {
+                let lower = a.min(b);
+                let upper = a.max(b);
+                format!("{lower}-{upper} and {upper}-{lower}")
+            }
+            Self::Direct(lower, upper) => format!("{lower}-{upper}"),
+        }
+    }
 }
 
 impl From<EscalatorInput> for Vec<Escalator> {
