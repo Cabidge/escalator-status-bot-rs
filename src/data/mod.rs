@@ -32,23 +32,6 @@ pub struct UserReport {
 }
 
 impl Data {
-    /// Create a clone of Data by cloning all of the Arcs.
-    ///
-    /// Not deriving Clone for Data because this is more explicit.
-    pub fn clone_arcs(&self) -> Data {
-        let shard_manager = Arc::clone(&self.shard_manager);
-        let statuses = Arc::clone(&self.statuses);
-        let report_menu = Arc::clone(&self.report_menu);
-        let history_channel = Arc::clone(&self.history_channel);
-
-        Data {
-            shard_manager,
-            statuses,
-            report_menu,
-            history_channel,
-        }
-    }
-
     pub async fn load_persist(
         shard_manager: Arc<Mutex<serenity::ShardManager>>,
         ctx: &serenity::Context,
