@@ -20,8 +20,16 @@ impl BotTask for SyncMenuTask {
             let statuses = &data.statuses;
             let report_menu = &data.report_menu;
 
-            // wait until an update is received
-            while let Ok(_) | Err(RecvError::Lagged(_)) = self.0.recv().await {
+            loop {
+                // wait until an update is received
+                match self.0.recv().await {
+                    // skip update if report was redundant
+                    Ok(Update::Report { redundant: true, .. }) => continue,
+                    Ok(_) => (),
+                    Err(RecvError::Lagged(_)) => (),
+                    Err(RecvError::Closed) => break,
+                }
+
                 let mut report_menu = report_menu.lock().await;
 
                 // if there is no report menu message, don't bother

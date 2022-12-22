@@ -38,7 +38,7 @@ pub struct Statuses {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Update {
-    Report(UserReport),
+    Report { report: UserReport, redundant: bool },
     Outdated(Escalator),
 }
 
@@ -249,9 +249,10 @@ impl Statuses {
             }
         }
 
+        // TODO: log error
+        let _ = self.updates.send(Update::Report { report, redundant: !any_updated }).ok();
+
         if any_updated {
-            // TODO: log error
-            let _ = self.updates.send(Update::Report(report)).ok();
             self.should_save = true;
         }
     }

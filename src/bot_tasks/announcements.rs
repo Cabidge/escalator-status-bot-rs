@@ -167,7 +167,7 @@ where
 
 fn partition_update(update: Update) -> Either<UserReport, (u8, u8)> {
     match update {
-        Update::Report(report) => Either::Left(report),
+        Update::Report { report, .. } => Either::Left(report),
         Update::Outdated(escalator) => Either::Right(escalator),
     }
 }
