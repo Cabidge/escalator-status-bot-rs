@@ -33,16 +33,16 @@ pub struct UserReport {
 
 impl Data {
     pub async fn load_persist(
+        persist: &PersistInstance,
         shard_manager: Arc<Mutex<serenity::ShardManager>>,
         ctx: &serenity::Context,
         user_reports_tx: mpsc::Sender<UserReport>,
         updates_tx: broadcast::Sender<Update>,
-        persist: &PersistInstance,
     ) -> Self {
-        let statuses = Statuses::load_persist(updates_tx, persist);
+        let statuses = Statuses::load_persist(persist, updates_tx);
         let statuses = Arc::new(Mutex::new(statuses));
 
-        let report_menu = ReportMenu::load_persist(user_reports_tx, ctx, persist).await;
+        let report_menu = ReportMenu::load_persist(persist, user_reports_tx, ctx).await;
         let report_menu = Arc::new(Mutex::new(report_menu));
 
         let history_channel = HistoryChannel::load_persist(persist);

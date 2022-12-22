@@ -70,7 +70,7 @@ impl Statuses {
         }
     }
 
-    pub fn load_persist(update_tx: broadcast::Sender<Update>, persist: &PersistInstance) -> Self {
+    pub fn load_persist(persist: &PersistInstance, update_tx: broadcast::Sender<Update>) -> Self {
         let (escalators, should_save) = persist
             .load::<Escalators>("escalators")
             .map(|escalators| (escalators, false)) // if load success, no need to save

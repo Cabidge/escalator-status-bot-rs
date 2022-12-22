@@ -52,7 +52,7 @@ async fn init(
 
             Box::pin(async move {
                 let data =
-                    Data::load_persist(shard_manager, ctx, user_reports_tx, updates_tx, &persist)
+                    Data::load_persist(&persist, shard_manager, ctx, user_reports_tx, updates_tx)
                         .await;
                 Ok(data)
             })

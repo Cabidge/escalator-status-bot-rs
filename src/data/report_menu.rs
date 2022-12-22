@@ -25,9 +25,9 @@ struct MenuHandle {
 
 impl ReportMenu {
     pub async fn load_persist(
+        persist: &PersistInstance,
         user_reports: mpsc::Sender<UserReport>,
         ctx: &serenity::Context,
-        persist: &PersistInstance,
     ) -> Self {
         let Ok(ids) = persist.load::<Option<(u64, u64)>>("report_menu") else {
             return Self::new(ctx.shard.clone(), user_reports, true);
