@@ -258,7 +258,7 @@ async fn handle_interaction(
         let sleep = tokio::time::sleep(Duration::from_secs(2 * 60));
         tokio::pin!(sleep);
 
-        let action =tokio::select! {
+        let action = tokio::select! {
             Some(action) = message.await_component_interaction(shard) => action,
             _ = sleep => break Err(anyhow!("Timeout")),
         };

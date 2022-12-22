@@ -12,8 +12,8 @@ pub use sync_menu::SyncMenuTask;
 
 use crate::prelude::*;
 
-use tokio::task::JoinHandle;
 use std::sync::Arc;
+use tokio::task::JoinHandle;
 
 pub trait BotTask {
     fn begin(self, framework: Arc<poise::Framework<Data, Error>>) -> JoinHandle<()>;
