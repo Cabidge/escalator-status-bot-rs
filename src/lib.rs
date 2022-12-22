@@ -3,10 +3,7 @@ mod commands;
 mod data;
 mod prelude;
 
-use bot_tasks::{
-    announcements::AnnouncementTask, autosave::AutoSaveTask, forward_reports::ForwardReportTask,
-    handle_outdated::HandleOutdatedTask, sync_menu::SyncMenuTask, BotTask,
-};
+use bot_tasks::*;
 use std::sync::Arc;
 use tokio::{
     sync::{broadcast, mpsc},

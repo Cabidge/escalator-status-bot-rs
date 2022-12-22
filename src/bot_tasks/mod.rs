@@ -1,12 +1,18 @@
-pub mod announcements;
-pub mod autosave;
-pub mod forward_reports;
-pub mod handle_outdated;
-pub mod sync_menu;
+mod announcements;
+mod autosave;
+mod forward_reports;
+mod handle_outdated;
+mod sync_menu;
 
-use tokio::task::JoinHandle;
+pub use announcements::AnnouncementTask;
+pub use autosave::AutoSaveTask;
+pub use forward_reports::ForwardReportTask;
+pub use handle_outdated::HandleOutdatedTask;
+pub use sync_menu::SyncMenuTask;
 
 use crate::prelude::*;
+
+use tokio::task::JoinHandle;
 use std::sync::Arc;
 
 pub trait BotTask {
