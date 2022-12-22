@@ -24,7 +24,9 @@ impl BotTask for SyncMenuTask {
                 // wait until an update is received
                 match self.0.recv().await {
                     // skip update if report was redundant
-                    Ok(Update::Report { redundant: true, .. }) => continue,
+                    Ok(Update::Report {
+                        redundant: true, ..
+                    }) => continue,
                     Ok(_) => (),
                     Err(RecvError::Lagged(_)) => (),
                     Err(RecvError::Closed) => break,
