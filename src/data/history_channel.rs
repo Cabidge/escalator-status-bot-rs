@@ -46,10 +46,13 @@ impl HistoryChannel {
         }
     }
 
-    pub fn load_persist(persist: &PersistInstance) -> Result<Self, Error> {
-        let id = persist.load::<Option<u64>>("history_channel")?;
+    pub fn load_persist(persist: &PersistInstance) -> Self {
+        let Ok(id) = persist.load::<Option<u64>>("history_channel") else {
+            return Self::new(None, true);
+        };
+
         let channel = id.map(serenity::ChannelId);
-        Ok(Self::new(channel, false))
+        Self::new(channel, false)
     }
 
     pub fn save_persist(&mut self, persist: &PersistInstance) {
@@ -65,11 +68,5 @@ impl HistoryChannel {
             channel,
             should_save,
         }
-    }
-}
-
-impl Default for HistoryChannel {
-    fn default() -> Self {
-        Self::new(None, true)
     }
 }

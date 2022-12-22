@@ -45,7 +45,7 @@ impl Data {
         let report_menu = ReportMenu::load_persist(user_reports_tx, ctx, persist).await;
         let report_menu = Arc::new(Mutex::new(report_menu));
 
-        let history_channel = HistoryChannel::load_persist(persist).unwrap_or_default();
+        let history_channel = HistoryChannel::load_persist(persist);
         let history_channel = Arc::new(RwLock::new(history_channel));
 
         Data {
