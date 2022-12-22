@@ -2,7 +2,6 @@ pub mod bot_tasks;
 pub mod commands;
 pub mod data;
 pub mod prelude;
-pub mod report_modal;
 
 use bot_tasks::{
     announcements::AnnouncementTask, autosave::AutoSaveTask, forward_reports::ForwardReportTask,
