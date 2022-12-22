@@ -11,7 +11,6 @@ use tokio::{sync::mpsc, task};
 
 #[derive(Debug)]
 pub struct ReportMenu {
-    shard_messenger: serenity::ShardMessenger,
     user_reports: mpsc::Sender<UserReport>,
     menu: Option<MenuHandle>,
     should_save: bool,
@@ -30,22 +29,22 @@ impl ReportMenu {
         ctx: &serenity::Context,
     ) -> Self {
         let Ok(ids) = persist.load::<Option<(u64, u64)>>("report_menu") else {
-            return Self::new(ctx.shard.clone(), user_reports, true);
+            return Self::new(user_reports, true);
         };
 
         let Some(ids) = ids else {
-            return Self::new(ctx.shard.clone(), user_reports, false);
+            return Self::new(user_reports, false);
         };
 
         let channel_id = serenity::ChannelId(ids.0);
         let message_id = serenity::MessageId(ids.1);
 
         let Ok(message) = channel_id.message(ctx, message_id).await else {
-            return Self::new(ctx.shard.clone(), user_reports, true);
+            return Self::new(user_reports, true);
         };
 
-        let mut report_menu = Self::new(ctx.shard.clone(), user_reports, false);
-        let menu = report_menu.create_handle(Arc::clone(&ctx.http), message);
+        let mut report_menu = Self::new(user_reports, false);
+        let menu = report_menu.create_handle(ctx, message);
 
         report_menu.menu = Some(menu);
 
@@ -63,13 +62,11 @@ impl ReportMenu {
     }
 
     fn new(
-        shard_messenger: serenity::ShardMessenger,
         user_reports: mpsc::Sender<UserReport>,
         should_save: bool,
     ) -> Self {
         Self {
             menu: None,
-            shard_messenger,
             user_reports,
             should_save,
         }
@@ -116,9 +113,8 @@ impl ReportMenu {
             .await?;
 
         let message = handle.into_message().await?;
-        let http = Arc::clone(&ctx.serenity_context().http);
 
-        let menu = self.create_handle(http, message);
+        let menu = self.create_handle(ctx.serenity_context(), message);
         self.menu = Some(menu);
         self.should_save = true;
 
@@ -141,12 +137,15 @@ impl ReportMenu {
         Ok(())
     }
 
-    fn create_handle(&self, http: Arc<serenity::Http>, message: serenity::Message) -> MenuHandle {
+    fn create_handle(&self, ctx: &serenity::Context, message: serenity::Message) -> MenuHandle {
+        let shard = ctx.shard.clone();
+        let http = Arc::clone(&ctx.http);
+
         let mut collector = message
-            .await_component_interactions(&self.shard_messenger)
+            .await_component_interactions(&shard)
             .build();
+
         let user_reports = self.user_reports.downgrade();
-        let shard = self.shard_messenger.clone();
 
         let interaction_task = tokio::spawn(async move {
             while let Some(interaction) = collector.next().await {
