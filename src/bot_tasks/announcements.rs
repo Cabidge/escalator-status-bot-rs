@@ -151,7 +151,7 @@ where
     let mut reports = reports.map(|report| report.to_string());
 
     if reports.len() <= MAX_REPORTS_DISPLAYED {
-        return Itertools::intersperse(reports, String::from("\n")).collect();
+        return reports.join("\n");
     }
 
     let mut message = String::new();

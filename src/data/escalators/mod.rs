@@ -193,20 +193,14 @@ impl Statuses {
             embed.color((240, 60, 60));
 
             // add summaries for down and blocked status escalators (only if there are any of either)
-            let summaries = [Status::Down, Status::Blocked]
+            let description = [Status::Down, Status::Blocked]
                 .into_iter()
                 .filter_map(|status| {
                     let escalators = self.escalators_with_status(Some(status));
                     (!escalators.is_empty())
                         .then(|| Self::summarize_status(Some(status), &escalators))
-                });
-
-            // annoying to have to do this to avoid possible name collisions...
-            // I just hope iter::intersperse get's stabilized soon so I can change this
-            //
-            // adds new lines between each summary for readability
-            let description: String =
-                Itertools::intersperse(summaries, String::from("\n")).collect();
+                })
+                .join("\n");
 
             embed.description(&description);
 
