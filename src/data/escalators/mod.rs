@@ -12,21 +12,34 @@ use tokio::sync::broadcast;
 use super::{status::Status, UserReport};
 use info::Info;
 
+/// An array of all valid escalators.
 pub const ESCALATORS: [Escalator; 14] = [
-    (2, 3),
-    (2, 4),
-    (3, 2),
-    (3, 5),
-    (4, 2),
-    (4, 6),
-    (5, 3),
-    (5, 7),
-    (6, 4),
-    (6, 8),
-    (7, 5),
-    (7, 9),
-    (8, 6),
-    (9, 7),
+    (2, 3), // 0
+    (2, 4), // 1
+    (3, 2), // 2
+    (3, 5), // 3
+    (4, 2), // 4
+    (4, 6), // 5
+    (5, 3), // 6
+    (5, 7), // 7
+    (6, 4), // 8
+    (6, 8), // 9
+    (7, 5), // 10
+    (7, 9), // 11
+    (8, 6), // 12
+    (9, 7), // 13
+];
+
+/// An array of all escalator indicies in "pair order,"
+/// (ie. escalator pairs come one after another)
+pub const PAIR_ORDER: [usize; 14] = [
+    0, 2, // 2/3
+    1, 4, // 2/4
+    3, 6, // 3/5
+    5, 8, // 4/6
+    7, 10, // 5/7
+    9, 12, // 6/8
+    11, 13, // 7/9
 ];
 
 #[derive(Debug, Clone)]
@@ -75,35 +88,16 @@ impl Statuses {
     }
 
     pub fn menu_message(&self) -> String {
-        let mut msg = String::from("**Escalator Statuses:**```py\n");
-
-        for (escalator, info) in self.escalators.iter() {
-            // display a different emoji depending on the status
-            msg.push(info.status_emoji());
-            msg.push(' ');
-
-            // if the status is open, surround escalator with quotes,
-            // otherwise use hashtags
-            let delimiter = if info.status() == Some(Status::Open) {
-                '"'
-            } else {
-                '#'
-            };
-
-            // escalator label
-            msg.push(delimiter);
-            msg.push((escalator.0 + b'0') as char);
-            msg.push('-');
-            msg.push((escalator.1 + b'0') as char);
-            msg.push(delimiter);
-
-            msg.push('\n');
-        }
-
-        // close the code block
-        msg.push_str("```");
-
-        msg
+        String::from("**Escalator Statuses:**```\n")
+            + &PAIR_ORDER
+                .into_iter()
+                .filter_map(|index| self.escalators.get_index(index))
+                .map(|((start, end), info)| format!("{} {}-{}", info.status_emoji(), start, end))
+                .chunks(2)
+                .into_iter()
+                .map(|mut pair| pair.join(" "))
+                .join("\n")
+            + "```"
     }
 
     /// Generates a summary for a specific status.
