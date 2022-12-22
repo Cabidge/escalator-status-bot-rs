@@ -250,7 +250,13 @@ impl Statuses {
         }
 
         // TODO: log error
-        let _ = self.updates.send(Update::Report { report, redundant: !any_updated }).ok();
+        let _ = self
+            .updates
+            .send(Update::Report {
+                report,
+                redundant: !any_updated,
+            })
+            .ok();
 
         if any_updated {
             self.should_save = true;
