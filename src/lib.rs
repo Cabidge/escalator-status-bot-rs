@@ -1,7 +1,7 @@
-pub mod bot_tasks;
-pub mod commands;
-pub mod data;
-pub mod prelude;
+mod bot_tasks;
+mod commands;
+mod data;
+mod prelude;
 
 use bot_tasks::{
     announcements::AnnouncementTask, autosave::AutoSaveTask, forward_reports::ForwardReportTask,
