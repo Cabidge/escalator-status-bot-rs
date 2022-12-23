@@ -543,7 +543,7 @@ impl EscalatorComponents {
                 let Some(end) = maybe_end else {
                     // if the start and selected floor create a valid escalator,
                     // set the end to the selected floor
-                    if Self::is_valid_escalator(*start, floor) {
+                    if is_valid_escalator(*start, floor) {
                         *maybe_end = Some(floor);
                     }
                     return;
@@ -575,14 +575,6 @@ impl EscalatorComponents {
         }
     }
 
-    fn is_valid_escalator(start: u8, end: u8) -> bool {
-        // if the start and end are valid floors...
-        ((2..=9).contains(&start) && (2..=9).contains(&end))
-            // ...and the distance between the two floors is 2
-            //                           ...or it is the 2-3 or 3-2
-            && (start.abs_diff(end) == 2 || matches!((start, end), (2, 3) | (3, 2)))
-    }
-
     fn is_floor_selected(&self, floor: u8) -> bool {
         match self {
             &Self::Floors {
@@ -596,7 +588,7 @@ impl EscalatorComponents {
     fn is_valid_next_floor(&self, floor: u8) -> bool {
         match self {
             Self::Floors { floors, .. } => match floors {
-                Some((start, None)) => Self::is_valid_escalator(*start, floor),
+                Some((start, None)) => is_valid_escalator(*start, floor),
                 Some((_, Some(_))) => false,
                 None => true,
             },
