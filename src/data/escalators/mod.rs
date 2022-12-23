@@ -12,8 +12,10 @@ use tokio::sync::broadcast;
 use super::{status::Status, UserReport};
 use info::Info;
 
+pub const ESCALATOR_COUNT: usize = 14;
+
 /// An array of all valid escalators.
-pub const ESCALATORS: [Escalator; 14] = [
+pub const ESCALATORS: [Escalator; ESCALATOR_COUNT] = [
     (2, 3), // 0
     (2, 4), // 1
     (3, 2), // 2
@@ -32,7 +34,7 @@ pub const ESCALATORS: [Escalator; 14] = [
 
 /// An array of all escalator indicies in "pair order,"
 /// (ie. escalator pairs come one after another)
-pub const PAIR_ORDER: [usize; 14] = [
+pub const PAIR_ORDER: [usize; ESCALATOR_COUNT] = [
     0, 2, // 2/3
     1, 4, // 2/4
     3, 6, // 3/5
