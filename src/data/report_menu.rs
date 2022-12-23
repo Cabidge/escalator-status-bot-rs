@@ -148,12 +148,18 @@ impl ReportMenu {
                     break;
                 };
 
-                // TODO: log error
-                if let Err(err) =
-                    handle_interaction(&interaction, user_reports, &http, &shard).await
-                {
-                    println!("{err:?}");
-                }
+                // spawn another task to handle the interaction so it
+                // doesn't block other interactions
+                let http = Arc::clone(&http);
+                let shard = shard.clone();
+                tokio::spawn(async move {
+                    // TODO: log error
+                    if let Err(err) =
+                        handle_interaction(&interaction, user_reports, &http, &shard).await
+                    {
+                        println!("{err:?}");
+                    }
+                });
             }
         });
 
