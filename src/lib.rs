@@ -62,6 +62,7 @@ async fn init(
         .map_err(anyhow::Error::new)?;
 
     let bot = EscalatorBot::new(framework)
+        .add_task(AlertTask(updates_rx.resubscribe()))
         .add_task(AutoSaveTask(persist))
         .add_task(AnnouncementTask(updates_rx.resubscribe()))
         .add_task(SyncMenuTask(updates_rx))

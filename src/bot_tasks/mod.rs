@@ -1,9 +1,11 @@
+mod alert;
 mod announcements;
 mod autosave;
 mod forward_reports;
 mod handle_outdated;
 mod sync_menu;
 
+pub use alert::AlertTask;
 pub use announcements::AnnouncementTask;
 pub use autosave::AutoSaveTask;
 pub use forward_reports::ForwardReportTask;
