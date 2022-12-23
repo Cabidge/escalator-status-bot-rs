@@ -97,10 +97,12 @@ impl ReportMenu {
 
         let content = ctx.data().statuses.lock().await.menu_message();
 
-        let message = ctx.channel_id().send_message(ctx, |msg| {
-            msg.content(content)
-                .components(add_report_buttons)
-        }).await?;
+        let message = ctx
+            .channel_id()
+            .send_message(ctx, |msg| {
+                msg.content(content).components(add_report_buttons)
+            })
+            .await?;
 
         ctx.say("Initialized report menu.").await?;
 
