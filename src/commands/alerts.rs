@@ -160,7 +160,7 @@ impl WatchListComponent {
 
         action_rows.last_mut().unwrap().create_button(|button| {
             button
-                .label("Save Watch List")
+                .label("Save List")
                 .custom_id(SUBMIT_BUTTON_ID)
                 .style(serenity::ButtonStyle::Success)
                 .emoji(SUBMIT_BUTTON_EMOJI)
