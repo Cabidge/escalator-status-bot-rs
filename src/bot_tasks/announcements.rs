@@ -69,6 +69,7 @@ impl BotTask for AnnouncementTask {
 
                 // get summary of the current escalator statuses
                 let mut embed = statuses.lock().await.gist();
+                embed.timestamp(chrono::Utc::now());
 
                 // separate the user reports from the status decays
                 let (reports, outdated): (Vec<_>, Vec<_>) =
