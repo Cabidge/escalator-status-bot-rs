@@ -63,11 +63,11 @@ async fn init(
 
     let bot = EscalatorBot::new(framework)
         .add_task(AlertTask(updates_rx.resubscribe()))
-        .add_task(AutoSaveTask(persist))
         .add_task(AnnouncementTask(updates_rx.resubscribe()))
-        .add_task(SyncMenuTask(updates_rx))
+        .add_task(AutoSaveTask(persist))
         .add_task(ForwardReportTask(user_reports_rx))
-        .add_task(HandleOutdatedTask);
+        .add_task(HandleOutdatedTask)
+        .add_task(SyncMenuTask(updates_rx));
 
     Ok(bot)
 }
