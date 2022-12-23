@@ -15,7 +15,7 @@ use shuttle_persist::PersistInstance;
 use std::{fmt::Display, sync::Arc};
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 
-use self::{escalator_input::EscalatorInput, status::Status, alerts::Alerts};
+use self::{alerts::Alerts, escalator_input::EscalatorInput, status::Status};
 
 #[derive(Debug)]
 pub struct Data {

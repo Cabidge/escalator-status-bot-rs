@@ -61,10 +61,7 @@ impl ReportMenu {
         }
     }
 
-    fn new(
-        user_reports: mpsc::Sender<UserReport>,
-        should_save: bool,
-    ) -> Self {
+    fn new(user_reports: mpsc::Sender<UserReport>, should_save: bool) -> Self {
         Self {
             menu: None,
             user_reports,
@@ -141,9 +138,7 @@ impl ReportMenu {
         let shard = ctx.shard.clone();
         let http = Arc::clone(&ctx.http);
 
-        let mut collector = message
-            .await_component_interactions(&shard)
-            .build();
+        let mut collector = message.await_component_interactions(&shard).build();
 
         let user_reports = self.user_reports.downgrade();
 

@@ -16,7 +16,10 @@ pub struct Alerts {
 type SimplifiedWatchlists = Vec<(u64, HashSet<Escalator>)>;
 
 impl Alerts {
-    pub async fn load_persist(persist: &PersistInstance, cache_http: impl serenity::CacheHttp) -> Self {
+    pub async fn load_persist(
+        persist: &PersistInstance,
+        cache_http: impl serenity::CacheHttp,
+    ) -> Self {
         let Ok(simplified) = persist.load::<SimplifiedWatchlists>("alerts") else {
             return Alerts {
                 watch_lists: HashMap::new(),
@@ -47,7 +50,8 @@ impl Alerts {
             false => return,
         }
 
-        let simplified = self.watch_lists
+        let simplified = self
+            .watch_lists
             .iter()
             .map(|(user, watch_list)| (user.id.0, watch_list))
             .collect_vec();

@@ -18,10 +18,11 @@ pub async fn add(
     ctx.defer_ephemeral().await?;
 
     if !is_valid_escalator(start, end) {
-        ctx.say(format!("The `{}-{}` is not a valid escalator.", start, end)).await?;
+        ctx.say(format!("The `{}-{}` is not a valid escalator.", start, end))
+            .await?;
         return Ok(());
     }
-    
+
     let mut alerts = ctx.data().alerts.lock().await;
 
     alerts.add(ctx.author(), (start, end));
@@ -47,7 +48,8 @@ pub async fn remove(
     ctx.defer_ephemeral().await?;
 
     if !is_valid_escalator(start, end) {
-        ctx.say(format!("The `{}-{}` is not a valid escalator.", start, end)).await?;
+        ctx.say(format!("The `{}-{}` is not a valid escalator.", start, end))
+            .await?;
         return Ok(());
     }
 
@@ -84,7 +86,12 @@ pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
             .sorted()
             .filter_map(|escalator| {
                 let info = statuses.get_info(*escalator)?;
-                Some(format!("{} {}-{}", info.status_emoji(), escalator.0, escalator.1))
+                Some(format!(
+                    "{} {}-{}",
+                    info.status_emoji(),
+                    escalator.0,
+                    escalator.1
+                ))
             })
             .join("\n")
         + "```";
