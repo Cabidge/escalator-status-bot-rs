@@ -91,25 +91,18 @@ impl ReportMenu {
 
     pub async fn initialize(&mut self, ctx: Context<'_>) -> Result<(), Error> {
         if self.is_initialized() {
-            ctx.send(|msg| {
-                msg.content("A report menu already exists, run `/menu clear` to delete it and clear it from memory.")
-                    .ephemeral(true)
-            }).await?;
-
+            ctx.say("A report menu already exists, run `/menu clear` to delete it and clear it from memory.").await?;
             return Ok(());
         }
 
         let content = ctx.data().statuses.lock().await.menu_message();
 
-        let handle = ctx
-            .send(|msg| {
-                msg.content(content)
-                    .components(add_report_buttons)
-                    .ephemeral(false)
-            })
-            .await?;
+        let message = ctx.channel_id().send_message(ctx, |msg| {
+            msg.content(content)
+                .components(add_report_buttons)
+        }).await?;
 
-        let message = handle.into_message().await?;
+        ctx.say("Initialized report menu.").await?;
 
         let menu = self.create_handle(ctx.serenity_context(), message);
         self.menu = Some(menu);
