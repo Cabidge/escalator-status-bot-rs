@@ -1,3 +1,4 @@
+mod alerts;
 mod history;
 mod menu;
 
@@ -12,6 +13,7 @@ pub fn commands() -> Vec<poise::Command<crate::Data, Error>> {
         history::history(),
         gist(),
         kill(),
+        alerts::alerts(),
     ]
 }
 

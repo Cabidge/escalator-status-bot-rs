@@ -1,3 +1,4 @@
+pub mod alerts;
 pub mod escalator_input;
 pub mod escalators;
 pub mod history_channel;
@@ -14,7 +15,7 @@ use shuttle_persist::PersistInstance;
 use std::{fmt::Display, sync::Arc};
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 
-use self::{escalator_input::EscalatorInput, status::Status};
+use self::{escalator_input::EscalatorInput, status::Status, alerts::Alerts};
 
 #[derive(Debug)]
 pub struct Data {
@@ -22,6 +23,7 @@ pub struct Data {
     pub statuses: Arc<Mutex<Statuses>>,
     pub report_menu: Arc<Mutex<ReportMenu>>,
     pub history_channel: Arc<RwLock<HistoryChannel>>,
+    pub alerts: Arc<Mutex<Alerts>>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -48,11 +50,15 @@ impl Data {
         let history_channel = HistoryChannel::load_persist(persist);
         let history_channel = Arc::new(RwLock::new(history_channel));
 
+        let alerts = Alerts::load_persist(persist, &ctx).await;
+        let alerts = Arc::new(Mutex::new(alerts));
+
         Data {
             shard_manager,
             statuses,
             report_menu,
             history_channel,
+            alerts,
         }
     }
 
@@ -60,6 +66,7 @@ impl Data {
         self.statuses.lock().await.save_persist(persist);
         self.report_menu.lock().await.save_persist(persist);
         self.history_channel.write().await.save_persist(persist);
+        self.alerts.lock().await.save_persist(persist);
     }
 }
 

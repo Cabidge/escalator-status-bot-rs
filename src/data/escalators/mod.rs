@@ -165,6 +165,10 @@ impl Statuses {
         noun
     }
 
+    pub fn get_info(&self, escalator: Escalator) -> Option<&Info> {
+        self.escalators.get(&escalator)
+    }
+
     /// Turn an escalator into a format that could be put into a message.
     fn nounify_escalator((start, end): Escalator) -> String {
         format!("`{}-{}`", start, end)

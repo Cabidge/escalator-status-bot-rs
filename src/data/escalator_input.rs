@@ -48,6 +48,10 @@ impl EscalatorInput {
             Self::Direct(lower, upper) => format!("{lower}-{upper}"),
         }
     }
+
+    pub fn is_singular(&self) -> bool {
+        matches!(self, Self::Direct(..))
+    }
 }
 
 impl From<EscalatorInput> for Vec<Escalator> {
