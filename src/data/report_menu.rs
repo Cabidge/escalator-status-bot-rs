@@ -277,7 +277,7 @@ async fn handle_interaction(
             .ok();
     };
 
-    drop(actions);
+    actions.stop();
 
     let Ok(mut report) = res else {
         interaction.edit_original_interaction_response(http, |msg| {
