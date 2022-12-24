@@ -8,7 +8,6 @@ use crate::prelude::*;
 pub fn commands() -> Vec<poise::Command<crate::Data, Error>> {
     vec![
         register(),
-        ping(),
         menu::menu(),
         history::history(),
         gist(),
@@ -28,13 +27,6 @@ async fn register(ctx: Context<'_>) -> Result<(), Error> {
 #[poise::command(prefix_command, owners_only)]
 async fn kill(ctx: Context<'_>) -> Result<(), Error> {
     ctx.data().shard_manager.lock().await.shutdown_all().await;
-    Ok(())
-}
-
-/// Pings the bot for it to pong back.
-#[poise::command(slash_command, ephemeral = true)]
-async fn ping(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.say("Pong!").await?;
     Ok(())
 }
 
