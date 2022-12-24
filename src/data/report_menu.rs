@@ -241,7 +241,7 @@ async fn handle_interaction(
     interaction
         .create_interaction_response(http, |res| {
             res.interaction_response_data(|data| {
-                data.set_components(report_input.create_components())
+                data.set_components(report_input.render())
                     .ephemeral(true)
             })
         })
@@ -268,7 +268,7 @@ async fn handle_interaction(
 
         action.defer(http).await.ok();
         
-        let components = report_input.create_components();
+        let components = report_input.render();
         interaction
             .edit_original_interaction_response(http, |res| {
                 res.components(replace_builder_with(components))
@@ -435,7 +435,7 @@ impl ReportComponents {
         }
     }
 
-    fn create_components(&self) -> serenity::CreateComponents {
+    fn render(&self) -> serenity::CreateComponents {
         let mut components = serenity::CreateComponents::default();
 
         // selecting escalators
