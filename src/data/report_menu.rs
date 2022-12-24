@@ -247,14 +247,18 @@ async fn handle_interaction(
         })
         .await?;
 
-    let message = interaction.get_interaction_response(http).await?;
+    let mut actions = interaction
+        .get_interaction_response(http)
+        .await?
+        .await_component_interactions(shard)
+        .build();
 
     let res = loop {
         let sleep = tokio::time::sleep(Duration::from_secs(2 * 60));
         tokio::pin!(sleep);
 
         let action = tokio::select! {
-            Some(action) = message.await_component_interaction(shard) => action,
+            Some(action) = actions.next() => action,
             _ = sleep => break Err(anyhow!("Timeout")),
         };
 
@@ -263,16 +267,17 @@ async fn handle_interaction(
         }
 
         action.defer(http).await.ok();
+        
+        let components = report_input.create_components();
         interaction
             .edit_original_interaction_response(http, |res| {
-                res.components(|components| {
-                    *components = report_input.create_components();
-                    components
-                })
+                res.components(replace_builder_with(components))
             })
             .await
             .ok();
     };
+
+    drop(actions);
 
     let Ok(mut report) = res else {
         interaction.edit_original_interaction_response(http, |msg| {
