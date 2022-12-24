@@ -8,11 +8,11 @@ use crate::prelude::*;
 pub fn commands() -> Vec<poise::Command<crate::Data, Error>> {
     vec![
         register(),
+        kill(),
         menu::menu(),
         history::history(),
-        gist(),
-        kill(),
         alerts::alerts(),
+        gist(),
     ]
 }
 
