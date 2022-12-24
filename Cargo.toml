@@ -9,6 +9,7 @@ edition = "2021"
 anyhow = "1.0.67"
 chrono = "0.4.23"
 indexmap = { version = "1.9.2", features = ["serde"] }
+indoc = "1.0.8"
 itertools = "0.10.5"
 lazy_static = "1.4.0"
 poise = "0.5.2"

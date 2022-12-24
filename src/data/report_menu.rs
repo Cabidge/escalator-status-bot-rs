@@ -1,10 +1,12 @@
 use std::{ops::BitOr, sync::Arc, time::Duration};
 
-use crate::prelude::*;
+use crate::{prelude::*, data::UNKNOWN_STATUS_EMOJI};
 
 use super::{escalator_input::EscalatorInput, status::Status, Statuses, UserReport};
 
 use anyhow::anyhow;
+use indexmap::{IndexMap, indexmap};
+use lazy_static::lazy_static;
 use poise::futures_util::StreamExt;
 use shuttle_persist::PersistInstance;
 use tokio::{sync::mpsc, task};
@@ -143,15 +145,23 @@ impl ReportMenu {
                     break;
                 };
 
-                // spawn another task to handle the interaction so it
-                // doesn't block other interactions
                 let http = Arc::clone(&http);
                 let shard = shard.clone();
+                // spawn another task to handle the interaction so it
+                // doesn't block other interactions
                 tokio::spawn(async move {
+                    let res = match interaction.data.custom_id.as_str() {
+                        REPORT_BUTTON_ID => {
+                            handle_report_interaction(&interaction, user_reports, &http, &shard).await
+                        }
+                        INFO_BUTTON_ID => {
+                            handle_info_interaction(&interaction, &http).await
+                        }
+                        _ => Ok(())
+                    };
+
                     // TODO: log error
-                    if let Err(err) =
-                        handle_interaction(&interaction, user_reports, &http, &shard).await
-                    {
+                    if let Err(err) = res {
                         println!("{err:?}");
                     }
                 });
@@ -197,15 +207,23 @@ impl Drop for MenuHandle {
 pub const REPORT_EMOJI: char = '📢';
 pub const REPORT_BUTTON_ID: &str = "REPORT";
 
+pub const INFO_EMOJI: char = '❔';
+pub const INFO_BUTTON_ID: &str = "INFO";
+
 /// Generate report button components with the proper IDs.
 pub fn add_report_buttons(
     components: &mut serenity::CreateComponents,
 ) -> &mut serenity::CreateComponents {
     components.create_action_row(|row| {
         row.create_button(|btn| {
-            btn.label("REPORT")
-                .emoji(REPORT_EMOJI)
+            btn.emoji(INFO_EMOJI)
                 .style(serenity::ButtonStyle::Secondary)
+                .custom_id(INFO_BUTTON_ID)
+        })
+        .create_button(|btn| {
+            btn.label("Report")
+                .emoji(REPORT_EMOJI)
+                .style(serenity::ButtonStyle::Primary)
                 .custom_id(REPORT_BUTTON_ID)
         })
     })
@@ -226,16 +244,79 @@ enum EscalatorComponents {
     All,
 }
 
-async fn handle_interaction(
+lazy_static! {
+    static ref INFO_FIELDS: IndexMap<&'static str, String> = {
+        indexmap! {
+            "Escalators" => indoc::indoc! {"
+                Every escalator can be identified by their starting and ending floors in the `#-#` format.
+
+                For example, the escalator for going from the 4th floor to the 2nd floor has the label `4-2`.
+            "}.to_owned(),
+            "Statuses" => indoc::formatdoc! {"
+                Next to each escalator is an emoji representing their current status.
+
+                There are four different states it could be in:
+                `{open} OPEN` - the escalator is in working condition.
+                `{down} DOWN` - the escalator isn't moving, but can be walked on.
+                `{blocked} BLOCKED` - the escalator is under maintenance and can't be walked on.
+                `{unknown} UNKNOWN` - the escalator hasn't been reported for a long time.
+                ",
+                open = Status::Open.emoji(),
+                down = Status::Down.emoji(),
+                blocked = Status::Blocked.emoji(),
+                unknown = UNKNOWN_STATUS_EMOJI
+            },
+            "Reports" => indoc::formatdoc! {"
+                You can report a status of an escalator by clicking the `{report} Report` button.
+
+                Once in the report menu, you can specify the escalator by selecting \
+                the starting and ending floors, and then you can select the status \
+                and submit the report.
+
+                You can also select `Pair` to report both the up and down escalators \
+                or `All` if every escalator goes down due to an emergency (eg. a fire).
+                ",
+                report = REPORT_EMOJI,
+            },
+            "Status Decay" => indoc::formatdoc! {"
+                An escalator automatically goes into an `{unknown} UNKNOWN` status after \
+                it hasn't been reported for a long time.
+
+                This can be prevented by re-reporting an escalator the same status it already is.
+
+                Doing so will reset the timer for status decay, thus it is encouraged to \
+                make redundant reports for an escalator you see multiple times a day.
+                ",
+                unknown = UNKNOWN_STATUS_EMOJI,
+            },
+        }
+    };
+}
+
+async fn handle_info_interaction(
+    interaction: &serenity::MessageComponentInteraction,
+    http: &serenity::Http,
+) -> Result<(), Error> {
+    interaction.create_interaction_response(http, |res| {
+        res.interaction_response_data(|data| {
+            data.embed(|embed| {
+                embed.title("What The Heck Does All Of This Mean?")
+                    .fields(INFO_FIELDS.iter().map(|(title, desc)| (title, desc, false)))
+            })
+            .ephemeral(true)
+        })
+    })
+    .await?;
+
+    Ok(())
+}
+
+async fn handle_report_interaction(
     interaction: &serenity::MessageComponentInteraction,
     user_reports: mpsc::Sender<UserReport>,
     http: &serenity::Http,
     shard: &serenity::ShardMessenger,
 ) -> Result<(), Error> {
-    if interaction.data.custom_id != REPORT_BUTTON_ID {
-        return Ok(());
-    }
-
     let mut report_input = ReportComponents::default();
 
     interaction
