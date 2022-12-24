@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use itertools::Itertools;
+use poise::futures_util::StreamExt;
 
 use crate::{
     data::{ESCALATORS, ESCALATOR_COUNT, PAIR_ORDER},
@@ -36,15 +37,18 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
         .send(|msg| msg.components(replace_builder_with(components.render())))
         .await?;
 
-    let message = handle.message().await?;
+    let mut actions = handle
+        .message()
+        .await?
+        .await_component_interactions(&ctx.serenity_context().shard)
+        .build();
 
-    let shard = &ctx.serenity_context().shard;
     let res = loop {
         let sleep = tokio::time::sleep(Duration::from_secs(2 * 60));
         tokio::pin!(sleep);
 
         let action = tokio::select! {
-            Some(action) = message.await_component_interaction(shard) => action,
+            Some(action) = actions.next() => action,
             _ = sleep => break Err(anyhow!("Timeout")),
         };
 
@@ -60,6 +64,8 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
             })
             .await?;
     };
+
+    actions.stop();
 
     let Ok(watch_list) = res else {
         handle.edit(ctx, |msg| {
