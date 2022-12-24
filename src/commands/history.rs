@@ -5,6 +5,7 @@ pub async fn history(_ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+/// (dev-only) Set the announcements channel.
 #[poise::command(slash_command, ephemeral = true)]
 async fn set(ctx: Context<'_>, channel: serenity::Channel) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;
@@ -19,6 +20,7 @@ async fn set(ctx: Context<'_>, channel: serenity::Channel) -> Result<(), Error> 
     Ok(())
 }
 
+/// (dev-only) Clear the announcements channel from memory.
 #[poise::command(slash_command, ephemeral = true)]
 async fn unset(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;

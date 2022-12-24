@@ -38,6 +38,7 @@ async fn ping(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+/// Display a summary of the escalator statuses.
 #[poise::command(slash_command, ephemeral = true)]
 async fn gist(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;
