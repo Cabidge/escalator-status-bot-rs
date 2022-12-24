@@ -216,15 +216,15 @@ pub fn add_report_buttons(
 ) -> &mut serenity::CreateComponents {
     components.create_action_row(|row| {
         row.create_button(|btn| {
-            btn.emoji(INFO_EMOJI)
-                .style(serenity::ButtonStyle::Secondary)
-                .custom_id(INFO_BUTTON_ID)
-        })
-        .create_button(|btn| {
             btn.label("Report")
                 .emoji(REPORT_EMOJI)
                 .style(serenity::ButtonStyle::Primary)
                 .custom_id(REPORT_BUTTON_ID)
+        })
+        .create_button(|btn| {
+            btn.emoji(INFO_EMOJI)
+                .style(serenity::ButtonStyle::Secondary)
+                .custom_id(INFO_BUTTON_ID)
         })
     })
 }
