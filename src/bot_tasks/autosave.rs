@@ -8,7 +8,7 @@ use tokio::task::JoinHandle;
 use super::BotTask;
 
 /// How much time to wait between each time trying to save.
-const AUTO_SAVE_INTERVAL: Duration = Duration::from_secs(15 * 60);
+const AUTO_SAVE_INTERVAL: Duration = Duration::from_secs(60);
 
 pub struct AutoSaveTask(pub Arc<PersistInstance>);
 
