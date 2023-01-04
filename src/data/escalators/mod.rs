@@ -1,6 +1,6 @@
 mod info;
 
-pub use self::info::UNKNOWN_STATUS_EMOJI;
+pub use self::info::{UNKNOWN_STATUS_EMOJI, ReportKind};
 
 use crate::prelude::*;
 
@@ -53,7 +53,7 @@ pub struct Statuses {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Update {
-    Report { report: UserReport, redundant: bool },
+    Report { report: UserReport, kind: ReportKind },
     Outdated(Escalator),
 }
 
@@ -235,24 +235,27 @@ impl Statuses {
 
     /// Update a given escalator's status.
     pub fn report(&mut self, report: UserReport) {
-        let mut any_updated = false;
-        // for each reported escalator, check if any of them successfully updated
-        for escalator in Vec::<_>::from(report.escalators) {
-            if let Some(info) = self.escalators.get_mut(&escalator) {
-                any_updated |= info.update_status(report.status);
-            }
-        }
+        // report each escalator and get the "most significant" report kind
+        let report_kind = Vec::<_>::from(report.escalators)
+            .into_iter()
+            .filter_map(|escalator| {
+                self.escalators
+                    .get_mut(&escalator)
+                    .map(|info| info.update_status(report.status))
+            })
+            .max()
+            .unwrap_or(ReportKind::Redundant);
 
         // TODO: log error
         let _ = self
             .updates
             .send(Update::Report {
                 report,
-                redundant: !any_updated,
+                kind: report_kind,
             })
             .ok();
 
-        if any_updated {
+        if report_kind != ReportKind::Redundant {
             self.should_save = true;
         }
     }

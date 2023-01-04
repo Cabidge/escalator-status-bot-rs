@@ -3,7 +3,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::{data::Update, prelude::*};
+use crate::{data::{Update, ReportKind}, prelude::*};
 
 use std::sync::Arc;
 
@@ -25,7 +25,7 @@ impl BotTask for SyncMenuTask {
                 match self.0.recv().await {
                     // skip update if report was redundant
                     Ok(Update::Report {
-                        redundant: true, ..
+                        kind: ReportKind::Redundant, ..
                     }) => continue,
                     Ok(_) => (),
                     Err(RecvError::Lagged(_)) => (),

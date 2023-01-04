@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast::{self, error::RecvError};
 
 use crate::{
-    data::{Update, UserReport},
+    data::{Update, UserReport, ReportKind},
     prelude::*,
 };
 
@@ -25,7 +25,7 @@ impl BotTask for AlertTask {
                 let report = match self.0.recv().await {
                     Ok(Update::Report {
                         report,
-                        redundant: false,
+                        kind: ReportKind::Normal,
                     }) => report,
                     Ok(_) => continue,
                     Err(RecvError::Lagged(_)) => continue,

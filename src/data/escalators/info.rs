@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{time::Duration, cmp::Ordering};
 
 use serde::{Deserialize, Serialize};
 
@@ -11,6 +11,15 @@ pub struct Info {
 }
 
 pub const UNKNOWN_STATUS_EMOJI: char = '🟡';
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReportKind {
+    Normal,
+    Redundant,
+    /// If report is updating an unknown status
+    Rejuvenate,
+}
+
 
 impl Info {
     /// How long it takes before marking an escalator's status as unknown (None).
@@ -27,13 +36,19 @@ impl Info {
         }
     }
 
-    /// Update the known status of this escalator, returning if it overrode the previous status.
-    pub fn update_status(&mut self, status: Status) -> bool {
+    /// Update the known status of this escalator, returning what kind of report it is.
+    pub fn update_status(&mut self, status: Status) -> ReportKind {
         self.last_update = std::time::SystemTime::now();
-        let updated = self.status != Some(status);
+
+        let previous = self.status;
+
         self.status = Some(status);
 
-        updated
+        match (previous, status) {
+            (Some(old), new) if old == new => ReportKind::Redundant,
+            (None, _) => ReportKind::Rejuvenate,
+            _ => ReportKind::Normal,
+        }
     }
 
     /// Checks if the last time the escalator was updated is beyond a given threshold,
@@ -73,6 +88,23 @@ impl Default for Info {
         Self {
             last_update: std::time::UNIX_EPOCH,
             status: None,
+        }
+    }
+}
+
+impl PartialOrd for ReportKind {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ReportKind {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (*self, *other) {
+            (this, that) if this == that => Ordering::Equal,
+            (Self::Normal, _) | (_, Self::Redundant) => Ordering::Greater,
+            (_, Self::Normal) | (Self::Redundant, _) => Ordering::Less,
+            (Self::Rejuvenate, Self::Rejuvenate) => unreachable!("If self and other are both rejuvenate, the first branch would've already caught it"),
         }
     }
 }
