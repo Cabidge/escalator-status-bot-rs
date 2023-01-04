@@ -1,6 +1,6 @@
 mod info;
 
-pub use self::info::{UNKNOWN_STATUS_EMOJI, ReportKind};
+pub use self::info::{ReportKind, UNKNOWN_STATUS_EMOJI};
 
 use crate::prelude::*;
 
@@ -53,7 +53,10 @@ pub struct Statuses {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Update {
-    Report { report: UserReport, kind: ReportKind },
+    Report {
+        report: UserReport,
+        kind: ReportKind,
+    },
     Outdated(Escalator),
 }
 
@@ -73,20 +76,32 @@ impl Statuses {
     }
 
     pub fn load_persist(persist: &PersistInstance, update_tx: broadcast::Sender<Update>) -> Self {
+        log::info!("Loading escalator statuses...");
+
         let (escalators, should_save) = persist
             .load::<Escalators>("escalators")
             .map(|escalators| (escalators, false)) // if load success, no need to save
-            .unwrap_or_else(|_| (Self::default_escalators(), true)); // if load failed, create default and save
+            .unwrap_or_else(|err| {
+                // if load failed, create default and save
+                log::error!("Load error: {err:?}");
+                (Self::default_escalators(), true)
+            });
 
         Self::new(escalators, update_tx, should_save)
     }
 
     pub fn save_persist(&mut self, persist: &PersistInstance) {
-        // TODO: log error
-        if self.should_save {
-            let _ = persist.save("escalators", &self.escalators).ok();
-            self.should_save = false;
+        if !self.should_save {
+            return;
         }
+
+        log::info!("Saving escalator statuses...");
+
+        if let Err(err) = persist.save("escalators", &self.escalators) {
+            log::error!("Save error: {err:?}");
+        }
+
+        self.should_save = false;
     }
 
     pub fn menu_message(&self) -> String {
@@ -235,6 +250,8 @@ impl Statuses {
 
     /// Update a given escalator's status.
     pub fn report(&mut self, report: UserReport) {
+        log::info!("Updating statuses based on report: {report:?}");
+
         // report each escalator and get the "most significant" report kind
         let report_kind = Vec::<_>::from(report.escalators)
             .into_iter()
@@ -246,14 +263,10 @@ impl Statuses {
             .max()
             .unwrap_or(ReportKind::Redundant);
 
-        // TODO: log error
-        let _ = self
-            .updates
-            .send(Update::Report {
-                report,
-                kind: report_kind,
-            })
-            .ok();
+        self.send_update(Update::Report {
+            report,
+            kind: report_kind,
+        });
 
         if report_kind != ReportKind::Redundant {
             self.should_save = true;
@@ -263,12 +276,29 @@ impl Statuses {
     /// Checks if the last time each escalator was updated is beyond a given threshold,
     /// setting the status to None if it is.
     pub fn handle_outdated(&mut self) {
-        for (escalator, info) in self.escalators.iter_mut() {
-            if info.handle_outdated() {
-                // TODO: log error
-                let _ = self.updates.send(Update::Outdated(*escalator)).ok();
-                self.should_save = true;
-            }
+        log::info!("Updating outdated statuses...");
+
+        let updates: Vec<_> = self
+            .escalators
+            .iter_mut()
+            .filter_map(|(escalator, info)| {
+                info.handle_outdated()
+                    .then_some(Update::Outdated(*escalator))
+            })
+            .collect();
+
+        self.should_save |= !updates.is_empty();
+
+        for update in updates {
+            self.send_update(update);
+        }
+    }
+
+    fn send_update(&self, update: Update) {
+        log::info!("Sending update...");
+
+        if let Err(err) = self.updates.send(update) {
+            log::error!("Update sending error: {err:?}");
         }
     }
 

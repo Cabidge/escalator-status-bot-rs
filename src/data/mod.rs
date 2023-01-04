@@ -41,6 +41,8 @@ impl Data {
         user_reports_tx: mpsc::Sender<UserReport>,
         updates_tx: broadcast::Sender<Update>,
     ) -> Self {
+        log::info!("Loading data...");
+
         let statuses = Statuses::load_persist(persist, updates_tx);
         let statuses = Arc::new(Mutex::new(statuses));
 

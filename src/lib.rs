@@ -46,7 +46,7 @@ async fn init(
         .setup(move |ctx, _ready, framework| {
             // set up bot data
             let persist = cloned_persist;
-            println!("Bot is ready");
+            log::info!("Bot is ready");
 
             let shard_manager = Arc::clone(framework.shard_manager());
 

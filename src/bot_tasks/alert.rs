@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast::{self, error::RecvError};
 
 use crate::{
-    data::{Update, UserReport, ReportKind},
+    data::{ReportKind, Update, UserReport},
     prelude::*,
 };
 
@@ -27,14 +27,26 @@ impl BotTask for AlertTask {
                         report,
                         kind: ReportKind::Normal,
                     }) => report,
-                    Ok(_) => continue,
-                    Err(RecvError::Lagged(_)) => continue,
-                    Err(RecvError::Closed) => break,
+                    Ok(update) => {
+                        log::debug!("Received {update:?}, skipping...");
+                        continue;
+                    }
+                    Err(RecvError::Lagged(n)) => {
+                        log::error!("Update receiver lagged by {n} updates.");
+                        continue;
+                    }
+                    Err(RecvError::Closed) => {
+                        log::warn!("Update receiver has closed.");
+                        break;
+                    }
                 };
+
+                log::info!("Alerting users...");
 
                 let UserReport {
                     escalators, status, ..
                 } = report;
+
                 alerts
                     .lock()
                     .await

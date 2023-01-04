@@ -16,6 +16,7 @@ impl BotTask for ForwardReportTask {
             let data = framework.user_data().await;
 
             while let Some(report) = self.0.recv().await {
+                log::info!("Forwarding reports...");
                 data.statuses.lock().await.report(report);
             }
         })

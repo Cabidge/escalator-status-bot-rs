@@ -20,6 +20,8 @@ impl BotTask for HandleOutdatedTask {
 
             loop {
                 interval.tick().await;
+
+                log::info!("Checking for outdated statuses...");
                 statuses.lock().await.handle_outdated();
             }
         })

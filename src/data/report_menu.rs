@@ -1,11 +1,11 @@
 use std::{ops::BitOr, sync::Arc, time::Duration};
 
-use crate::{prelude::*, data::UNKNOWN_STATUS_EMOJI};
+use crate::{data::UNKNOWN_STATUS_EMOJI, prelude::*};
 
 use super::{escalator_input::EscalatorInput, status::Status, Statuses, UserReport};
 
 use anyhow::anyhow;
-use indexmap::{IndexMap, indexmap};
+use indexmap::{indexmap, IndexMap};
 use lazy_static::lazy_static;
 use poise::futures_util::StreamExt;
 use shuttle_persist::PersistInstance;
@@ -30,8 +30,14 @@ impl ReportMenu {
         user_reports: mpsc::Sender<UserReport>,
         ctx: &serenity::Context,
     ) -> Self {
-        let Ok(ids) = persist.load::<Option<(u64, u64)>>("report_menu") else {
-            return Self::new(user_reports, true);
+        log::info!("Loading report menu...");
+
+        let ids = match persist.load::<Option<(u64, u64)>>("report_menu") {
+            Ok(ids) => ids,
+            Err(err) => {
+                log::error!("Load error: {err:?}");
+                return Self::new(user_reports, true);
+            }
         };
 
         let Some(ids) = ids else {
@@ -41,8 +47,12 @@ impl ReportMenu {
         let channel_id = serenity::ChannelId(ids.0);
         let message_id = serenity::MessageId(ids.1);
 
-        let Ok(message) = channel_id.message(ctx, message_id).await else {
-            return Self::new(user_reports, true);
+        let message = match channel_id.message(ctx, message_id).await {
+            Ok(message) => message,
+            Err(err) => {
+                log::error!("Load error: {err:?}");
+                return Self::new(user_reports, true);
+            }
         };
 
         let mut report_menu = Self::new(user_reports, false);
@@ -54,13 +64,19 @@ impl ReportMenu {
     }
 
     pub fn save_persist(&mut self, persist: &PersistInstance) {
-        if self.should_save {
-            let ids = self.menu.as_ref().map(MenuHandle::ids);
-
-            let _ = persist.save("report_menu", ids).ok();
-
-            self.should_save = false;
+        if !self.should_save {
+            return;
         }
+
+        log::info!("Saving report menu...");
+
+        let ids = self.menu.as_ref().map(MenuHandle::ids);
+
+        if let Err(err) = persist.save("report_menu", ids) {
+            log::error!("Save error: {err:?}");
+        }
+
+        self.should_save = false;
     }
 
     fn new(user_reports: mpsc::Sender<UserReport>, should_save: bool) -> Self {
@@ -150,19 +166,25 @@ impl ReportMenu {
                 // spawn another task to handle the interaction so it
                 // doesn't block other interactions
                 tokio::spawn(async move {
+                    log::debug!("Attempting to handle report menu interaction made by {}#{}...", &interaction.user.name, interaction.user.discriminator);
                     let res = match interaction.data.custom_id.as_str() {
                         REPORT_BUTTON_ID => {
-                            handle_report_interaction(&interaction, user_reports, &http, &shard).await
+                            log::info!("Report button interaction.");
+                            handle_report_interaction(&interaction, user_reports, &http, &shard)
+                                .await
                         }
                         INFO_BUTTON_ID => {
+                            log::info!("Info button interaction.");
                             handle_info_interaction(&interaction, &http).await
                         }
-                        _ => Ok(())
+                        id => {
+                            log::warn!("Unknown interaction id: {id:?}");
+                            Ok(())
+                        }
                     };
 
-                    // TODO: log error
                     if let Err(err) = res {
-                        println!("{err:?}");
+                        log::error!("Interaction error: {err:?}");
                     }
                 });
             }
@@ -297,16 +319,18 @@ async fn handle_info_interaction(
     interaction: &serenity::MessageComponentInteraction,
     http: &serenity::Http,
 ) -> Result<(), Error> {
-    interaction.create_interaction_response(http, |res| {
-        res.interaction_response_data(|data| {
-            data.embed(|embed| {
-                embed.title("What The Heck Does All Of This Mean?")
-                    .fields(INFO_FIELDS.iter().map(|(title, desc)| (title, desc, false)))
+    interaction
+        .create_interaction_response(http, |res| {
+            res.interaction_response_data(|data| {
+                data.embed(|embed| {
+                    embed
+                        .title("What The Heck Does All Of This Mean?")
+                        .fields(INFO_FIELDS.iter().map(|(title, desc)| (title, desc, false)))
+                })
+                .ephemeral(true)
             })
-            .ephemeral(true)
         })
-    })
-    .await?;
+        .await?;
 
     Ok(())
 }
@@ -322,8 +346,7 @@ async fn handle_report_interaction(
     interaction
         .create_interaction_response(http, |res| {
             res.interaction_response_data(|data| {
-                data.set_components(report_input.render())
-                    .ephemeral(true)
+                data.set_components(report_input.render()).ephemeral(true)
             })
         })
         .await?;
@@ -348,7 +371,7 @@ async fn handle_report_interaction(
         }
 
         action.defer(http).await.ok();
-        
+
         let components = report_input.render();
         interaction
             .edit_original_interaction_response(http, |res| {
@@ -361,12 +384,15 @@ async fn handle_report_interaction(
     actions.stop();
 
     let Ok(mut report) = res else {
+        log::debug!("Interaction timed out.");
+
         interaction.edit_original_interaction_response(http, |msg| {
             msg.content("Interaction timed out, try again...")
                 .components(|components| {
                     components.set_action_rows(vec![])
                 })
         }).await.ok();
+
         return Ok(());
     };
 
@@ -374,9 +400,9 @@ async fn handle_report_interaction(
         report.reporter = Some(member.user.id);
     }
 
-    // TODO: log error
+    log::debug!("Sending report: {report:?}");
     if let Err(err) = user_reports.send(report).await {
-        println!("{err}");
+        log::error!("Report sending error: {err}");
     }
 
     let message = format!(
@@ -384,6 +410,7 @@ async fn handle_report_interaction(
         report.status.emoji(),
         report.escalators.message_noun()
     );
+
     interaction
         .edit_original_interaction_response(http, |msg| {
             msg.content(message)

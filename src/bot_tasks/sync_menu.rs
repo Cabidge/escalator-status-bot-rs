@@ -3,7 +3,10 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::{data::{Update, ReportKind}, prelude::*};
+use crate::{
+    data::{ReportKind, Update},
+    prelude::*,
+};
 
 use std::sync::Arc;
 
@@ -25,24 +28,35 @@ impl BotTask for SyncMenuTask {
                 match self.0.recv().await {
                     // skip update if report was redundant
                     Ok(Update::Report {
-                        kind: ReportKind::Redundant, ..
-                    }) => continue,
+                        kind: ReportKind::Redundant,
+                        ..
+                    }) => {
+                        log::debug!("Received redundant report, skipping.");
+                        continue;
+                    }
                     Ok(_) => (),
-                    Err(RecvError::Lagged(_)) => (),
-                    Err(RecvError::Closed) => break,
+                    Err(RecvError::Lagged(n)) => {
+                        log::debug!("Update receiver lagged by {n} updates.")
+                    }
+                    Err(RecvError::Closed) => {
+                        log::debug!("Update receiver closed.");
+                        break;
+                    }
                 }
+
+                log::info!("Preparing to update report menu...");
 
                 let mut report_menu = report_menu.lock().await;
 
                 // if there is no report menu message, don't bother
                 if !report_menu.is_initialized() {
+                    log::debug!("Report menu is not initialized.");
                     continue;
                 }
 
                 let statuses = statuses.lock().await;
                 if let Err(err) = report_menu.update(&cache_http, &statuses).await {
-                    // TODO: preoperly log error
-                    println!("{err:?}");
+                    log::error!("Report menu error: {err:?}");
                 }
             }
         })

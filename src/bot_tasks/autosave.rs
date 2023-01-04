@@ -21,8 +21,7 @@ impl BotTask for AutoSaveTask {
             loop {
                 interval.tick().await;
 
-                // TODO: proper logging
-                println!("Attempting save...");
+                log::debug!("Attempting save...");
                 data.save_persist(&self.0).await;
             }
         })

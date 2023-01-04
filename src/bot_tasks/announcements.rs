@@ -37,10 +37,15 @@ impl BotTask for AnnouncementTask {
                 let first_update = match self.0.recv().await {
                     Ok(update) => update,
                     // if the channel closed (for some reason) then stop the loop
-                    Err(broadcast::error::RecvError::Closed) => break,
+                    Err(broadcast::error::RecvError::Closed) => {
+                        log::debug!("Update receiver has closed.");
+                        break;
+                    }
                     // if the receiver is lagging beind, restart the loop and try receiving again
-                    // TODO: log channel lag
-                    Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(broadcast::error::RecvError::Lagged(n)) => {
+                        log::warn!("Update receiver has lagged by {n} updates.");
+                        continue;
+                    }
                 };
 
                 let now = Instant::now();
@@ -51,6 +56,11 @@ impl BotTask for AnnouncementTask {
                 } else {
                     MIN_INTERVAL
                 };
+
+                log::info!(
+                    "Received update, pooling for {} seconds before announcing.",
+                    delay.as_secs()
+                );
 
                 let sleep = tokio::time::sleep(delay);
                 tokio::pin!(sleep);
@@ -66,6 +76,8 @@ impl BotTask for AnnouncementTask {
                         () = &mut sleep => break,
                     }
                 }
+
+                log::info!("Generating announcement...");
 
                 // get summary of the current escalator statuses
                 let mut embed = statuses.lock().await.gist();
@@ -120,6 +132,7 @@ impl BotTask for AnnouncementTask {
                 }
 
                 // send embed to history channel
+                log::info!("Sending announcement...");
                 let res = history_channel
                     .read()
                     .await
@@ -130,11 +143,14 @@ impl BotTask for AnnouncementTask {
 
                 match res {
                     Ok(Some(msg)) => {
-                        let _ = msg.crosspost(&cache_http).await.ok();
+                        log::info!("Publishing announcement.");
+
+                        if let Err(err) = msg.crosspost(&cache_http).await {
+                            log::warn!("Publish error: {err:?}");
+                        }
                     }
-                    Ok(None) => (),
-                    // TODO: handle error
-                    Err(err) => println!("{err:?}"),
+                    Ok(None) => log::info!("No history channel found."),
+                    Err(err) => log::error!("Announcement error: {err:?}"),
                 }
 
                 last_announcement = Instant::now();

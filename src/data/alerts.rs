@@ -21,11 +21,18 @@ impl Alerts {
         persist: &PersistInstance,
         cache_http: impl serenity::CacheHttp,
     ) -> Self {
-        let Ok(simplified) = persist.load::<SimplifiedWatchLists>("alerts") else {
-            return Alerts {
-                watch_lists: HashMap::new(),
-                should_save: true,
-            };
+        log::info!("Loading watch lists...");
+
+        let simplified = match persist.load::<SimplifiedWatchLists>("alerts") {
+            Ok(loaded) => loaded,
+            Err(err) => {
+                log::error!("Load error: {err:?}");
+
+                return Alerts {
+                    watch_lists: HashMap::new(),
+                    should_save: true,
+                };
+            }
         };
 
         let mut watch_lists = HashMap::new();
@@ -51,17 +58,27 @@ impl Alerts {
             false => return,
         }
 
+        log::info!("Saving watch lists...");
+
         let simplified = self
             .watch_lists
             .iter()
             .map(|(user, watch_list)| (user.id.0, watch_list))
             .collect_vec();
 
-        persist.save("alerts", simplified).ok();
+        if let Err(err) = persist.save("alerts", simplified) {
+            log::error!("Save error: {err:?}");
+        }
     }
 
     // Replace a user's original watch list with an updated list.
     pub fn replace(&mut self, user: &serenity::User, watch_list: WatchList) {
+        log::debug!(
+            "Updating {}#{}'s watch list...",
+            &user.name,
+            user.discriminator
+        );
+
         // if the watch list is all unselected
         if watch_list.iter().all(|selected| !selected) {
             // remove the watch list

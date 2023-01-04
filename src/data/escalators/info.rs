@@ -1,4 +1,4 @@
-use std::{time::Duration, cmp::Ordering};
+use std::{cmp::Ordering, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
@@ -19,7 +19,6 @@ pub enum ReportKind {
     /// If report is updating an unknown status
     Rejuvenate,
 }
-
 
 impl Info {
     /// How long it takes before marking an escalator's status as unknown (None).
