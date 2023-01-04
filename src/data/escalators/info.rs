@@ -14,7 +14,7 @@ pub const UNKNOWN_STATUS_EMOJI: char = '🟡';
 
 impl Info {
     /// How long it takes before marking an escalator's status as unknown (None).
-    const OUTDATED_THRESHOLD: Duration = Duration::from_secs(20 * 60 * 60);
+    const OUTDATED_THRESHOLD: Duration = Duration::from_secs(2 * 24 * 60 * 60);
 
     pub fn status(&self) -> Option<Status> {
         self.status
