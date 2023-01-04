@@ -12,10 +12,10 @@ use super::BotTask;
 
 /// How much time to wait to send the history after receiving an update
 /// if there hasn't been one in the past MAX_INTERVAL.
-const MIN_INTERVAL: Duration = Duration::from_secs(30);
+const MIN_INTERVAL: Duration = Duration::from_secs(60);
 
 /// The most amount of time to wait to send the history after receiving an update.
-const MAX_INTERVAL: Duration = Duration::from_secs(2 * 60);
+const MAX_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 pub struct AnnouncementTask(pub broadcast::Receiver<Update>);
 
