@@ -22,7 +22,7 @@ pub enum ReportKind {
 
 impl Info {
     /// How long it takes before marking an escalator's status as unknown (None).
-    const OUTDATED_THRESHOLD: Duration = Duration::from_secs(2 * 24 * 60 * 60);
+    const OUTDATED_THRESHOLD: Duration = Duration::from_secs((5 * 24 + 1) * 60 * 60);
 
     pub fn status(&self) -> Option<Status> {
         self.status
