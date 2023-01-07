@@ -18,6 +18,8 @@ const MIN_INTERVAL: Duration = Duration::from_secs(60);
 /// The most amount of time to wait to send the history after receiving an update.
 const MAX_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
+const MAX_REPORTS_DISPLAYED: usize = 8;
+
 pub struct AnnouncementTask(pub broadcast::Receiver<Update>);
 
 #[derive(Default)]
@@ -27,8 +29,6 @@ struct AnnouncementBuilder {
 }
 
 impl AnnouncementBuilder {
-    const MAX_REPORTS_DISPLAYED: usize = 8;
-
     fn add_update(&mut self, update: Update) {
         match update {
             Update::Outdated(escalator) => {
@@ -85,12 +85,12 @@ impl AnnouncementBuilder {
     {
         let mut reports = reports.map(|report| report.to_string());
 
-        if reports.len() <= Self::MAX_REPORTS_DISPLAYED {
+        if reports.len() <= MAX_REPORTS_DISPLAYED {
             return reports.join("\n");
         }
 
         let mut message = String::new();
-        for report in reports.by_ref().take(Self::MAX_REPORTS_DISPLAYED - 1) {
+        for report in reports.by_ref().take(MAX_REPORTS_DISPLAYED - 1) {
             message.push_str(&report);
             message.push('\n');
         }
@@ -123,7 +123,7 @@ impl BotTask for AnnouncementTask {
                         Ok(Update::Report {
                             report,
                             kind: ReportKind::Redundant,
-                        }) if announcement.reports.len() < 15 => {
+                        }) if announcement.reports.len() < MAX_REPORTS_DISPLAYED => {
                             log::debug!("Received redundant report, continuing...");
                             announcement.add_report(report);
                         }
