@@ -1,11 +1,12 @@
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use crate::{
-    data::{Statuses, Update, UserReport, UNKNOWN_STATUS_EMOJI},
+    data::{Statuses, Update, UserReport, UNKNOWN_STATUS_EMOJI, ReportKind},
     prelude::*,
 };
 
-use itertools::{Either, Itertools};
+use indexmap::IndexSet;
+use itertools::Itertools;
 use tokio::{sync::broadcast, task::JoinHandle, time::Instant};
 
 use super::BotTask;
@@ -18,6 +19,64 @@ const MIN_INTERVAL: Duration = Duration::from_secs(60);
 const MAX_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 pub struct AnnouncementTask(pub broadcast::Receiver<Update>);
+
+#[derive(Default)]
+struct AnnouncementBuilder {
+    reports: Vec<UserReport>,
+    outdated: IndexSet<Escalator>,
+}
+
+impl AnnouncementBuilder {
+    fn add_update(&mut self, update: Update) {
+        match update {
+            Update::Outdated(escalator) => {
+                self.outdated.insert(escalator);
+            }
+            Update::Report { report, .. } => self.add_report(report),
+        }
+    }
+
+    fn add_report(&mut self, report: UserReport) {
+        self.reports.push(report);
+
+        for escalator in report.escalators {
+            self.outdated.shift_remove(&escalator);
+        }
+    }
+
+    fn attach(self, embed: &mut serenity::CreateEmbed) {
+        // add report history
+        if !self.reports.is_empty() {
+            let message = format_reports(self.reports.into_iter().rev());
+            embed.field("Recent reports (newest first)", message, false);
+        }
+
+        // add outdated
+        if !self.outdated.is_empty() {
+            fn make_ascii_titlecase(s: &mut str) {
+                if let Some(r) = s.get_mut(0..1) {
+                    r.make_ascii_uppercase();
+                }
+            }
+
+            let outdated = self.outdated.into_iter().collect_vec();
+            let mut escalators = Statuses::nounify_escalators(&outdated);
+            make_ascii_titlecase(&mut escalators);
+
+            let mut message = format!("`{}` {}", UNKNOWN_STATUS_EMOJI, escalators);
+
+            if outdated.len() == 1 {
+                message.push_str(" has ");
+            } else {
+                message.push_str(" have ");
+            }
+
+            message.push_str("been marked as `UNKNOWN` due to infrequent reports.");
+
+            embed.field("Outdated", message, false);
+        }
+    }
+}
 
 impl BotTask for AnnouncementTask {
     fn begin(mut self, framework: Arc<poise::Framework<Data, Error>>) -> JoinHandle<()> {
@@ -32,21 +91,31 @@ impl BotTask for AnnouncementTask {
 
             // it might be a good idea to add a check to see if there is a history
             // channel set, so it doesn't do all of this work if it doesn't need to.
-            loop {
-                // wait until an update is received
-                let first_update = match self.0.recv().await {
-                    Ok(update) => update,
-                    // if the channel closed (for some reason) then stop the loop
-                    Err(broadcast::error::RecvError::Closed) => {
-                        log::debug!("Update receiver has closed.");
-                        break;
-                    }
-                    // if the receiver is lagging beind, restart the loop and try receiving again
-                    Err(broadcast::error::RecvError::Lagged(n)) => {
-                        log::warn!("Update receiver has lagged by {n} updates.");
-                        continue;
-                    }
-                };
+            'announcement: loop {
+                let mut announcement = AnnouncementBuilder::default();
+
+                // wait until a significant update is received
+                loop {
+                    match self.0.recv().await {
+                        Ok(Update::Report { report, kind: ReportKind::Redundant }) if announcement.reports.len() < 15 => {
+                            log::debug!("Received redundant report, continuing...");
+                            announcement.add_report(report);
+                        },
+                        Ok(update) => {
+                            announcement.add_update(update);
+                            break;
+                        }
+                        // if the channel closed (for some reason) then stop the loop
+                        Err(broadcast::error::RecvError::Closed) => {
+                            log::debug!("Update receiver has closed.");
+                            break 'announcement;
+                        }
+                        // if the receiver is lagging beind, restart the loop and try receiving again
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            log::warn!("Update receiver has lagged by {n} updates.");
+                        }
+                    };
+                }
 
                 let now = Instant::now();
 
@@ -66,13 +135,9 @@ impl BotTask for AnnouncementTask {
                 tokio::pin!(sleep);
 
                 // continue to save the updates until the interval is up
-                let mut history = vec![first_update];
                 loop {
                     tokio::select! {
-                        Ok(next_update) = self.0.recv() => {
-                            history.push(next_update);
-                            continue;
-                        }
+                        Ok(update) = self.0.recv() => announcement.add_update(update),
                         () = &mut sleep => break,
                     }
                 }
@@ -83,53 +148,7 @@ impl BotTask for AnnouncementTask {
                 let mut embed = statuses.lock().await.gist();
                 embed.timestamp(chrono::Utc::now());
 
-                // separate the user reports from the status decays
-                let (reports, outdated): (Vec<_>, Vec<_>) =
-                    history.into_iter().partition_map(partition_update);
-
-                // collect all reported escalators into a set
-                let reported_escalators = reports
-                    .iter()
-                    .map(|report| report.escalators)
-                    .flat_map(Vec::from)
-                    .collect::<HashSet<_>>();
-
-                // filter out outdated statuses that have recently been reported
-                let outdated = outdated
-                    .into_iter()
-                    .filter(|escalator| !reported_escalators.contains(escalator))
-                    .sorted()
-                    .collect::<Vec<_>>();
-
-                // add report history
-                if !reports.is_empty() {
-                    let message = format_reports(reports.into_iter().rev());
-                    embed.field("Recent reports (newest first)", message, false);
-                }
-
-                // add outdated
-                if !outdated.is_empty() {
-                    fn make_ascii_titlecase(s: &mut str) {
-                        if let Some(r) = s.get_mut(0..1) {
-                            r.make_ascii_uppercase();
-                        }
-                    }
-
-                    let mut escalators = Statuses::nounify_escalators(&outdated);
-                    make_ascii_titlecase(&mut escalators);
-
-                    let mut message = format!("`{}` {}", UNKNOWN_STATUS_EMOJI, escalators);
-
-                    if outdated.len() == 1 {
-                        message.push_str(" has ");
-                    } else {
-                        message.push_str(" have ");
-                    }
-
-                    message.push_str("been marked as `UNKNOWN` due to infrequent reports.");
-
-                    embed.field("Outdated", message, false);
-                }
+                announcement.attach(&mut embed);
 
                 // send embed to history channel
                 log::info!("Sending announcement...");
@@ -180,11 +199,4 @@ where
     message.push_str(&format!("\n*(...and {} more)*", reports.len()));
 
     message
-}
-
-fn partition_update(update: Update) -> Either<UserReport, (u8, u8)> {
-    match update {
-        Update::Report { report, .. } => Either::Left(report),
-        Update::Outdated(escalator) => Either::Right(escalator),
-    }
 }
