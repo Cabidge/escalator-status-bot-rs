@@ -27,6 +27,8 @@ struct AnnouncementBuilder {
 }
 
 impl AnnouncementBuilder {
+    const MAX_REPORTS_DISPLAYED: usize = 14;
+
     fn add_update(&mut self, update: Update) {
         match update {
             Update::Outdated(escalator) => {
@@ -47,7 +49,7 @@ impl AnnouncementBuilder {
     fn attach(self, embed: &mut serenity::CreateEmbed) {
         // add report history
         if !self.reports.is_empty() {
-            let message = format_reports(self.reports.into_iter().rev());
+            let message = Self::format_reports(self.reports.into_iter().rev());
             embed.field("Recent reports (newest first)", message, false);
         }
 
@@ -75,6 +77,27 @@ impl AnnouncementBuilder {
 
             embed.field("Outdated", message, false);
         }
+    }
+
+    fn format_reports<I>(reports: I) -> String
+    where
+        I: Iterator<Item = UserReport> + ExactSizeIterator,
+    {
+        let mut reports = reports.map(|report| report.to_string());
+
+        if reports.len() <= Self::MAX_REPORTS_DISPLAYED {
+            return reports.join("\n");
+        }
+
+        let mut message = String::new();
+        for report in reports.by_ref().take(Self::MAX_REPORTS_DISPLAYED - 1) {
+            message.push_str(&report);
+            message.push('\n');
+        }
+
+        message.push_str(&format!("\n*(...and {} more)*", reports.len()));
+
+        message
     }
 }
 
@@ -176,27 +199,4 @@ impl BotTask for AnnouncementTask {
             }
         })
     }
-}
-
-const MAX_REPORTS_DISPLAYED: usize = 14;
-
-fn format_reports<I>(reports: I) -> String
-where
-    I: Iterator<Item = UserReport> + ExactSizeIterator,
-{
-    let mut reports = reports.map(|report| report.to_string());
-
-    if reports.len() <= MAX_REPORTS_DISPLAYED {
-        return reports.join("\n");
-    }
-
-    let mut message = String::new();
-    for report in reports.by_ref().take(MAX_REPORTS_DISPLAYED - 1) {
-        message.push_str(&report);
-        message.push('\n');
-    }
-
-    message.push_str(&format!("\n*(...and {} more)*", reports.len()));
-
-    message
 }
