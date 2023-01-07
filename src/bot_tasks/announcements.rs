@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use crate::{
-    data::{Statuses, Update, UserReport, UNKNOWN_STATUS_EMOJI, ReportKind},
+    data::{ReportKind, Statuses, Update, UserReport, UNKNOWN_STATUS_EMOJI},
     prelude::*,
 };
 
@@ -120,10 +120,13 @@ impl BotTask for AnnouncementTask {
                 // wait until a significant update is received
                 loop {
                     match self.0.recv().await {
-                        Ok(Update::Report { report, kind: ReportKind::Redundant }) if announcement.reports.len() < 15 => {
+                        Ok(Update::Report {
+                            report,
+                            kind: ReportKind::Redundant,
+                        }) if announcement.reports.len() < 15 => {
                             log::debug!("Received redundant report, continuing...");
                             announcement.add_report(report);
-                        },
+                        }
                         Ok(update) => {
                             announcement.add_update(update);
                             break;

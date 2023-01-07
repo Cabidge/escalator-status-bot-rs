@@ -253,7 +253,8 @@ impl Statuses {
         log::info!("Updating statuses based on report: {report:?}");
 
         // report each escalator and get the "most significant" report kind
-        let report_kind = report.escalators
+        let report_kind = report
+            .escalators
             .into_iter()
             .filter_map(|escalator| {
                 self.escalators

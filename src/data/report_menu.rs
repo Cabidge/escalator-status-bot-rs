@@ -166,7 +166,11 @@ impl ReportMenu {
                 // spawn another task to handle the interaction so it
                 // doesn't block other interactions
                 tokio::spawn(async move {
-                    log::debug!("Attempting to handle report menu interaction made by {}#{}...", &interaction.user.name, interaction.user.discriminator);
+                    log::debug!(
+                        "Attempting to handle report menu interaction made by {}#{}...",
+                        &interaction.user.name,
+                        interaction.user.discriminator
+                    );
                     let res = match interaction.data.custom_id.as_str() {
                         REPORT_BUTTON_ID => {
                             log::info!("Report button interaction.");

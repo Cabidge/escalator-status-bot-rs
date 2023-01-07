@@ -1,4 +1,4 @@
-use crate::{prelude::*, data::ESCALATORS};
+use crate::{data::ESCALATORS, prelude::*};
 
 pub enum Iter {
     All(usize),
@@ -24,12 +24,10 @@ impl Iterator for Iter {
 
                 Some(escalator)
             }
-            Self::Direct(start, end, done) => {
-                (*done).then(|| {
-                    *done = true;
-                    (*start, *end)
-                })
-            }
+            Self::Direct(start, end, done) => (*done).then(|| {
+                *done = true;
+                (*start, *end)
+            }),
         }
     }
 }
