@@ -27,7 +27,7 @@ struct AnnouncementBuilder {
 }
 
 impl AnnouncementBuilder {
-    const MAX_REPORTS_DISPLAYED: usize = 14;
+    const MAX_REPORTS_DISPLAYED: usize = 8;
 
     fn add_update(&mut self, update: Update) {
         match update {
