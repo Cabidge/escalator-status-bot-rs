@@ -1,3 +1,5 @@
+pub mod iter;
+
 use crate::prelude::*;
 
 use super::ESCALATORS;
@@ -60,6 +62,19 @@ impl From<EscalatorInput> for Vec<Escalator> {
             EscalatorInput::All => ESCALATORS.into_iter().collect(),
             EscalatorInput::Pair(a, b) => vec![(a, b), (b, a)],
             EscalatorInput::Direct(a, b) => vec![(a, b)],
+        }
+    }
+}
+
+impl IntoIterator for EscalatorInput {
+    type IntoIter = self::iter::Iter;
+    type Item = Escalator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            Self::All => self::iter::Iter::All(0),
+            Self::Pair(a, b) => self::iter::Iter::Pair(a, b),
+            Self::Direct(a, b) => self::iter::Iter::Direct(a, b, false),
         }
     }
 }
