@@ -3,7 +3,8 @@ use crate::{data::ESCALATORS, prelude::*};
 pub enum Iter {
     All(usize),
     Pair(u8, u8),
-    Direct(u8, u8, bool),
+    Direct(u8, u8),
+    None,
 }
 
 impl Iterator for Iter {
@@ -20,15 +21,15 @@ impl Iterator for Iter {
             &mut Self::Pair(start, end) => {
                 let escalator = (start, end);
 
-                *self = Self::Direct(end, start, false);
+                *self = Self::Direct(end, start);
 
                 Some(escalator)
             }
-            Self::Direct(start, end, done @ false) => {
-                *done = true;
-                Some((*start, *end))
+            &mut Self::Direct(start, end) => {
+                *self = Self::None;
+                Some((start, end))
             },
-            Self::Direct(_, _, true) => None,
+            Self::None => None,
         }
     }
 }

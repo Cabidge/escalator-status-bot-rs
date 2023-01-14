@@ -74,7 +74,7 @@ impl IntoIterator for EscalatorInput {
         match self {
             Self::All => self::iter::Iter::All(0),
             Self::Pair(a, b) => self::iter::Iter::Pair(a, b),
-            Self::Direct(a, b) => self::iter::Iter::Direct(a, b, false),
+            Self::Direct(a, b) => self::iter::Iter::Direct(a, b),
         }
     }
 }
