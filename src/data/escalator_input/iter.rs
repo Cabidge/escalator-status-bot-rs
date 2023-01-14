@@ -24,10 +24,11 @@ impl Iterator for Iter {
 
                 Some(escalator)
             }
-            Self::Direct(start, end, done) => (*done).then(|| {
+            Self::Direct(start, end, done @ false) => {
                 *done = true;
-                (*start, *end)
-            }),
+                Some((*start, *end))
+            },
+            Self::Direct(_, _, true) => None,
         }
     }
 }
