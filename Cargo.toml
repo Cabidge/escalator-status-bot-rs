@@ -13,11 +13,14 @@ indoc = "1.0.8"
 itertools = "0.10.5"
 lazy_static = "1.4.0"
 log = "0.4.17"
+parking_lot = "0.12.1"
 poise = "0.5.2"
 serde = { version = "1.0", features = ["derive"] }
 shuttle-persist = "0.8.0"
 shuttle-secrets = "0.8.0"
 shuttle-service = "0.8.0"
+shuttle-shared-db = { version = "0.8.0", features = ["postgres"] }
+sqlx = { version = "0.6.2", features = ["runtime-tokio-native-tls", "postgres"] }
 tokio = { version = "1", features = ["full"] }
 
 [patch.crates-io]

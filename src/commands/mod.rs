@@ -33,11 +33,5 @@ async fn kill(ctx: Context<'_>) -> Result<(), Error> {
 /// Display a summary of the escalator statuses.
 #[poise::command(slash_command, ephemeral = true)]
 async fn gist(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.defer_ephemeral().await?;
-
-    let gist = ctx.data().statuses.lock().await.gist();
-    ctx.send(move |msg| msg.embed(replace_builder_with(gist)))
-        .await?;
-
-    Ok(())
+    todo!()
 }

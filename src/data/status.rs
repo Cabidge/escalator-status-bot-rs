@@ -2,7 +2,8 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(sqlx::Type, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[sqlx(type_name = "escalator_status", rename_all = "lowercase")]
 pub enum Status {
     Open,
     Down,

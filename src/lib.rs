@@ -1,14 +1,14 @@
 mod bot_tasks;
 mod commands;
 mod data;
+mod generate;
+mod migration;
 mod prelude;
 
 use bot_tasks::*;
+use shuttle_service::error::CustomError;
 use std::sync::Arc;
-use tokio::{
-    sync::{broadcast, mpsc},
-    task,
-};
+use tokio::task;
 
 use prelude::*;
 
@@ -21,18 +21,14 @@ struct EscalatorBot {
 async fn init(
     #[shuttle_secrets::Secrets] secret_store: shuttle_secrets::SecretStore,
     #[shuttle_persist::Persist] persist: shuttle_persist::PersistInstance,
+    #[shuttle_shared_db::Postgres] pool: sqlx::PgPool,
 ) -> Result<EscalatorBot, shuttle_service::Error> {
     // try to get token, errors if token isn't found
     let Some(token) = secret_store.get("TOKEN") else {
         return Err(anyhow::anyhow!("Discord token not found...").into());
     };
 
-    let persist = Arc::new(persist);
-
-    let (updates_tx, updates_rx) = broadcast::channel(32);
-    let (user_reports_tx, user_reports_rx) = mpsc::channel(2);
-
-    let cloned_persist = Arc::clone(&persist);
+    sqlx::migrate!().run(&pool).await.map_err(CustomError::new)?;
 
     // create bot framework
     let framework = poise::Framework::builder()
@@ -44,30 +40,22 @@ async fn init(
         .token(token)
         .intents(serenity::GatewayIntents::non_privileged())
         .setup(move |ctx, _ready, framework| {
-            // set up bot data
-            let persist = cloned_persist;
-            log::info!("Bot is ready");
-
-            let shard_manager = Arc::clone(framework.shard_manager());
-
             Box::pin(async move {
-                let data =
-                    Data::load_persist(&persist, shard_manager, ctx, user_reports_tx, updates_tx)
-                        .await;
-                Ok(data)
+                // set up bot data
+                log::info!("Bot is ready");
+
+                let shard_manager = Arc::clone(framework.shard_manager());
+
+                migration::migrate_to_sqlx(&persist, &pool, &ctx).await;
+
+                Ok(Data::new(shard_manager, pool))
             })
         })
         .build()
         .await
         .map_err(anyhow::Error::new)?;
 
-    let bot = EscalatorBot::new(framework)
-        .add_task(AlertTask(updates_rx.resubscribe()))
-        .add_task(AnnouncementTask(updates_rx.resubscribe()))
-        .add_task(AutoSaveTask(persist))
-        .add_task(ForwardReportTask(user_reports_rx))
-        .add_task(HandleOutdatedTask)
-        .add_task(SyncMenuTask(updates_rx));
+    let bot = EscalatorBot::new(framework);
 
     Ok(bot)
 }
@@ -81,7 +69,7 @@ impl EscalatorBot {
     }
 
     fn add_task<T: BotTask>(mut self, task: T) -> Self {
-        self.tasks.push(task.begin(Arc::clone(&self.framework)));
+        self.tasks.push(task.begin(Arc::downgrade(&self.framework)));
         self
     }
 }
