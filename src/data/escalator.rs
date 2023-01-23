@@ -8,7 +8,7 @@ pub struct Escalator {
     pub status: Status,
 }
 
-#[derive(sqlx::FromRow, Clone, Copy)]
+#[derive(sqlx::FromRow, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EscalatorFloors {
     #[sqlx(rename = "floor_start", try_from = "i16")]
     pub start: u8,
