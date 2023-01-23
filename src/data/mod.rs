@@ -1,10 +1,11 @@
 pub mod channels;
+pub mod escalator;
 pub mod status;
 
 use crate::prelude::*;
 
 use std::sync::Arc;
-use tokio::sync::{Mutex, broadcast};
+use tokio::sync::{broadcast, Mutex};
 
 pub struct Data {
     pub shard_manager: Arc<Mutex<serenity::ShardManager>>,
