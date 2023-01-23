@@ -1,11 +1,11 @@
-use crate::{prelude::*, data::status::Status};
+use crate::{data::status::Status, prelude::*};
 
 use indexmap::IndexMap;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 const ESCALATOR_COUNT: usize = 14;
 
-const ESCALATORS: [Escalator; ESCALATOR_COUNT] = [
+const ESCALATORS: [EscalatorTuple; ESCALATOR_COUNT] = [
     (2, 3), // 0
     (2, 4), // 1
     (3, 2), // 2
@@ -28,11 +28,17 @@ struct Info {
     status: Option<Status>,
 }
 
-type Escalators = IndexMap<Escalator, Info>;
+type EscalatorTuple = (u8, u8);
+
+type Escalators = IndexMap<EscalatorTuple, Info>;
 
 type WatchLists = Vec<(u64, [bool; ESCALATOR_COUNT])>;
 
-pub async fn migrate_to_sqlx(persist: &shuttle_persist::PersistInstance, pool: &sqlx::PgPool, ctx: &serenity::Context) {
+pub async fn migrate_to_sqlx(
+    persist: &shuttle_persist::PersistInstance,
+    pool: &sqlx::PgPool,
+    ctx: &serenity::Context,
+) {
     if persist.load::<bool>("migrated").unwrap_or_default() {
         log::debug!("Already migrated to sql database, skipping...");
         return;
@@ -56,7 +62,7 @@ pub async fn migrate_to_sqlx(persist: &shuttle_persist::PersistInstance, pool: &
                 SET current_status = $1
                 WHERE floor_Start = $2
                 AND floor_end = $3
-                "
+                ",
             )
             .bind(status)
             .bind(start as i16)
@@ -72,16 +78,17 @@ pub async fn migrate_to_sqlx(persist: &shuttle_persist::PersistInstance, pool: &
 
     // alerts/watchlists
     if let Ok(watchlists) = persist.load::<WatchLists>("alerts") {
-        let values = watchlists.into_iter()
-            .flat_map(|(user_id, watchlist)| {
-                watchlist.into_iter()
-                    .zip(ESCALATORS)
-                    .filter_map(move |(active, escalator)| active.then_some((user_id, escalator)))
-            });
+        let values = watchlists.into_iter().flat_map(|(user_id, watchlist)| {
+            watchlist
+                .into_iter()
+                .zip(ESCALATORS)
+                .filter_map(move |(active, escalator)| active.then_some((user_id, escalator)))
+        });
 
         let res = sqlx::QueryBuilder::new("INSERT INTO alerts (user_id, floor_start, floor_end) ")
             .push_values(values, |mut value, (user_id, (start, end))| {
-                value.push_bind(user_id as i64)
+                value
+                    .push_bind(user_id as i64)
                     .push_bind(start as i16)
                     .push_bind(end as i16);
             })
@@ -96,7 +103,10 @@ pub async fn migrate_to_sqlx(persist: &shuttle_persist::PersistInstance, pool: &
 
     // history/announcements channel
     (async {
-        let channel_id = persist.load::<Option<u64>>("history_channel").ok().flatten()?;
+        let channel_id = persist
+            .load::<Option<u64>>("history_channel")
+            .ok()
+            .flatten()?;
 
         let channel = serenity::ChannelId(channel_id)
             .to_channel(&ctx.http)
@@ -110,7 +120,7 @@ pub async fn migrate_to_sqlx(persist: &shuttle_persist::PersistInstance, pool: &
             "
             INSERT INTO announcement_channels (guild_id, channel_id)
             VALUES ($1, $2)
-            "
+            ",
         )
         .bind(guild_id as i64)
         .bind(channel_id as i64)
@@ -122,11 +132,15 @@ pub async fn migrate_to_sqlx(persist: &shuttle_persist::PersistInstance, pool: &
         }
 
         Some(())
-    }).await;
+    })
+    .await;
 
     // report menu message
     (async {
-        let (channel_id, message_id) = persist.load::<Option<(u64, u64)>>("report_menu").ok().flatten()?;
+        let (channel_id, message_id) = persist
+            .load::<Option<(u64, u64)>>("report_menu")
+            .ok()
+            .flatten()?;
 
         let channel = serenity::ChannelId(channel_id)
             .to_channel(&ctx.http)
@@ -140,7 +154,7 @@ pub async fn migrate_to_sqlx(persist: &shuttle_persist::PersistInstance, pool: &
             "
             INSERT INTO menu_messages (guild_id, channel_id, message_id)
             VALUES ($1, $2, $3)
-            "
+            ",
         )
         .bind(guild_id as i64)
         .bind(channel_id as i64)
@@ -153,7 +167,8 @@ pub async fn migrate_to_sqlx(persist: &shuttle_persist::PersistInstance, pool: &
         }
 
         Some(())
-    }).await;
+    })
+    .await;
 
     if let Err(err) = persist.save("migrated", true) {
         log::error!("Error setting migrated to true {}", err);
