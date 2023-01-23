@@ -28,7 +28,10 @@ async fn init(
         return Err(anyhow::anyhow!("Discord token not found...").into());
     };
 
-    sqlx::migrate!().run(&pool).await.map_err(CustomError::new)?;
+    sqlx::migrate!()
+        .run(&pool)
+        .await
+        .map_err(CustomError::new)?;
 
     // create bot framework
     let framework = poise::Framework::builder()

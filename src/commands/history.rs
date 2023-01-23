@@ -21,7 +21,7 @@ async fn set(ctx: Context<'_>, channel: serenity::Channel) -> Result<(), Error> 
         VALUES ($1, $2)
         ON CONFLICT (guild_id)
             DO UPDATE SET channel_id = $2
-        "
+        ",
     )
     .bind(guild_id.0 as i64)
     .bind(channel.id().0 as i64)
@@ -55,7 +55,7 @@ async fn remove(ctx: Context<'_>) -> Result<(), Error> {
         "
         DELETE FROM announcement_channels
         WHERE guild_id = $1
-        "
+        ",
     )
     .bind(guild_id.0 as i64)
     .execute(&ctx.data().pool)
