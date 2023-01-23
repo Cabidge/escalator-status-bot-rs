@@ -28,12 +28,11 @@ async fn set(ctx: Context<'_>, channel: serenity::Channel) -> Result<(), Error> 
     .execute(&ctx.data().pool)
     .await;
 
-    let msg = match res {
-        Ok(_) => format!("Set history channel to <#{}>.", channel.id()),
-        Err(err) => {
-            log::warn!("An error ocurred while updating the history channel: {err}");
-            String::from("A database error ocurred.")
-        }
+    let msg = if let Err(err) = res {
+        log::warn!("An error ocurred while updating the history channel: {err}");
+        String::from("A database error ocurred.")
+    } else {
+        format!("Set history channel to <#{}>.", channel.id())
     };
 
     ctx.say(msg).await?;
