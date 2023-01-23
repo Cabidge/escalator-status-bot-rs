@@ -1,3 +1,13 @@
+use super::status::Status;
+
+#[derive(sqlx::FromRow, Clone, Copy)]
+pub struct Escalator {
+    #[sqlx(flatten)]
+    pub floors: EscalatorFloors,
+    #[sqlx(rename = "current_status")]
+    pub status: Status,
+}
+
 #[derive(sqlx::FromRow, Clone, Copy)]
 pub struct EscalatorFloors {
     #[sqlx(rename = "floor_start", try_from = "i16")]
