@@ -1,6 +1,6 @@
 use super::status::Status;
 
-#[derive(sqlx::FromRow, Clone, Copy)]
+#[derive(sqlx::FromRow, Clone, Copy, PartialEq, Eq)]
 pub struct Escalator {
     #[sqlx(flatten)]
     pub floors: EscalatorFloors,
