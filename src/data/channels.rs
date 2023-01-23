@@ -1,24 +1,28 @@
-use std::{any::{TypeId, Any}, collections::{HashMap, hash_map::Entry}};
+use std::{
+    any::{Any, TypeId},
+    collections::{hash_map::Entry, HashMap},
+};
 
 use tokio::sync::broadcast;
 
 pub struct AnyChannels {
-    channels: HashMap<TypeId, Box<dyn Any + Send + Sync>>
+    channels: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
 impl AnyChannels {
     pub fn new() -> Self {
-        AnyChannels { channels: HashMap::new() }
+        AnyChannels {
+            channels: HashMap::new(),
+        }
     }
 
     pub fn sender<T: 'static + Clone + Send + Sync>(&mut self) -> broadcast::Sender<T> {
         match self.channels.entry(TypeId::of::<T>()) {
-            Entry::Occupied(entry) => {
-                entry.get()
-                    .downcast_ref::<broadcast::Sender<T>>()
-                    .expect("The TypeId MUST map to a broadcast::Sender of the same type")
-                    .clone()
-            }
+            Entry::Occupied(entry) => entry
+                .get()
+                .downcast_ref::<broadcast::Sender<T>>()
+                .expect("The TypeId MUST map to a broadcast::Sender of the same type")
+                .clone(),
             Entry::Vacant(entry) => {
                 let (tx, _rx) = broadcast::channel(16);
                 entry.insert(Box::new(tx.clone()));
@@ -30,12 +34,11 @@ impl AnyChannels {
 
     pub fn receiver<T: 'static + Clone + Send + Sync>(&mut self) -> broadcast::Receiver<T> {
         match self.channels.entry(TypeId::of::<T>()) {
-            Entry::Occupied(entry) => {
-                entry.get()
-                    .downcast_ref::<broadcast::Sender<T>>()
-                    .expect("The TypeId MUST map to a broadcast::Sender of the same type")
-                    .subscribe()
-            }
+            Entry::Occupied(entry) => entry
+                .get()
+                .downcast_ref::<broadcast::Sender<T>>()
+                .expect("The TypeId MUST map to a broadcast::Sender of the same type")
+                .subscribe(),
             Entry::Vacant(entry) => {
                 let (tx, rx) = broadcast::channel(16);
                 entry.insert(Box::new(tx));
