@@ -6,6 +6,6 @@ use tokio::task::JoinHandle;
 pub trait BotTask {
     type Data;
 
-    fn setup(&self, framework: Weak<poise::Framework<Data, Error>>) -> Option<Data>;
+    fn setup(&self, framework: Weak<poise::Framework<Data, Error>>) -> Option<Self::Data>;
     fn begin(self, data: Self::Data) -> JoinHandle<()>;
 }
