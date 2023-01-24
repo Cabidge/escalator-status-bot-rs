@@ -72,7 +72,12 @@ impl EscalatorBot {
     }
 
     fn add_task<T: BotTask>(mut self, task: T) -> Self {
-        self.tasks.push(task.begin(Arc::downgrade(&self.framework)));
+        if let Some(data) = task.setup(Arc::downgrade(&self.framework)) {
+            self.tasks.push(task.begin(data));
+        } else {
+            log::error!("Faield to run setup for bot task: {}", std::any::type_name::<T>())
+        }
+
         self
     }
 }
