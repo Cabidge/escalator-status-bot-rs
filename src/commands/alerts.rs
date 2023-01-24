@@ -97,7 +97,7 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
         return Ok(());
     };
 
-    if let Err(err) = update_watchlist(&ctx.data().pool, watchlist).await {
+    if let Err(err) = update_watchlist(&ctx.data().pool, ctx.author().id, watchlist).await {
         log::error!("An error ocurred trying to update watchlist: {err}");
         handle
             .edit(ctx, |msg| msg.content("A database error ocurred."))
@@ -206,8 +206,63 @@ async fn load_watchlist(
     Ok(watchlist)
 }
 
-async fn update_watchlist(pool: &sqlx::PgPool, watchlist: &Watchlist) -> Result<(), sqlx::Error> {
-    Ok(())
+async fn update_watchlist(
+    pool: &sqlx::PgPool,
+    user_id: serenity::UserId,
+    watchlist: &Watchlist,
+) -> Result<(), sqlx::Error> {
+    let mut transaction = pool.begin().await?;
+
+    let mut starts = vec![];
+    let mut ends = vec![];
+
+    let watching = watchlist
+        .iter()
+        .filter_map(|(floors, sub)| (sub.is_watching()).then_some(*floors));
+
+    for EscalatorFloors { start, end } in watching {
+        starts.push(start as i16);
+        ends.push(end as i16);
+    }
+
+    sqlx::query(
+        "
+        DELETE FROM alerts a
+        WHERE user_id = $1
+        AND NOT EXISTS (
+            SELECT FROM UNNEST($2::smallint[], $3::smallint[])
+                AS w (floor_start, floor_end)
+            WHERE a.floor_start = w.floor_start
+            AND a.floor_end = w.floor_end
+        )
+        ",
+    )
+    .bind(user_id.0 as i16)
+    .bind(&starts)
+    .bind(&ends)
+    .execute(&mut transaction)
+    .await?;
+
+    sqlx::query(
+        "
+        INSERT INTO alerts (user_id, floor_start, floor_end)
+        SELECT $1 as user_id, w.floor_start, w.floor_end
+        FROM UNNEST($2::smallint[], $3::smallint[])
+            AS w (floor_start, floor_end)
+        LEFT OUTER JOIN alerts a
+            ON $1 = a.user_id
+            AND w.floor_start = a.floor_start
+            AND w.floor_end = a.floor_end
+        WHERE a.user_id IS NULL
+        ",
+    )
+    .bind(user_id.0 as i16)
+    .bind(&starts)
+    .bind(&ends)
+    .execute(&mut transaction)
+    .await?;
+
+    transaction.commit().await
 }
 
 const ESCALATOR_BUTTON_ID_PREFIX: &str = "ALERTS-ESCALATOR-";
@@ -286,6 +341,13 @@ impl Subscription {
         match self {
             Self::Watch => *self = Self::Ignore,
             Self::Ignore => *self = Self::Watch,
+        }
+    }
+
+    fn is_watching(&self) -> bool {
+        match self {
+            Self::Watch => true,
+            Self::Ignore => false,
         }
     }
 }
