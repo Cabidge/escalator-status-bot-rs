@@ -71,12 +71,17 @@ impl EscalatorBot {
         }
     }
 
-    fn add_task<T: BotTask>(mut self, task: T) -> Self {
-        if let Some(data) = task.setup(Arc::downgrade(&self.framework)) {
-            self.tasks.push(task.begin(data));
-        } else {
-            log::error!("Faield to run setup for bot task: {}", std::any::type_name::<T>())
-        }
+    fn add_task<T: BotTask + 'static>(mut self, task: T) -> Self {
+        let framework = Arc::downgrade(&self.framework);
+        let handle = tokio::spawn(async move {
+            if let Some(data) = task.setup(framework).await {
+                task.run(data).await;
+            } else {
+                log::error!("Faield to run setup for bot task: {}", std::any::type_name::<T>());
+            }
+        });
+
+        self.tasks.push(handle);
 
         self
     }

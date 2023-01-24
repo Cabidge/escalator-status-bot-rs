@@ -1,11 +1,12 @@
 use crate::prelude::*;
 
 use std::sync::Weak;
-use tokio::task::JoinHandle;
+use poise::async_trait;
 
-pub trait BotTask {
-    type Data;
+#[async_trait]
+pub trait BotTask: Send + Sync {
+    type Data: Send;
 
-    fn setup(&self, framework: Weak<poise::Framework<Data, Error>>) -> Option<Self::Data>;
-    fn begin(self, data: Self::Data) -> JoinHandle<()>;
+    async fn setup(&self, framework: Weak<poise::Framework<Data, Error>>) -> Option<Self::Data>;
+    async fn run(self, data: Self::Data);
 }
