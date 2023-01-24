@@ -1,6 +1,6 @@
 use crate::{data::status::Status, prelude::*};
 
-pub async fn gist(pool: &sqlx::PgPool) -> Result<serenity::CreateEmbed, Error> {
+pub async fn gist(pool: &sqlx::PgPool) -> Result<serenity::CreateEmbed, sqlx::Error> {
     // -- Setup
 
     let mut embed = serenity::CreateEmbed::default();
