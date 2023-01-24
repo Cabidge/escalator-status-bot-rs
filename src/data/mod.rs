@@ -24,11 +24,11 @@ impl Data {
         }
     }
 
-    pub fn sender<T: 'static + Clone + Send + Sync>(&mut self) -> broadcast::Sender<T> {
+    pub fn sender<T: 'static + Clone + Send + Sync>(&self) -> broadcast::Sender<T> {
         self.channels.lock().sender()
     }
 
-    pub fn receiver<T: 'static + Clone + Send + Sync>(&mut self) -> broadcast::Receiver<T> {
+    pub fn receiver<T: 'static + Clone + Send + Sync>(&self) -> broadcast::Receiver<T> {
         self.channels.lock().receiver()
     }
 }
