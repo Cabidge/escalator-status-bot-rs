@@ -1,4 +1,6 @@
-use futures::TryStreamExt;
+use std::{str::FromStr, time::Duration};
+
+use futures::{StreamExt, TryStreamExt};
 use indexmap::IndexMap;
 use itertools::Itertools;
 
@@ -10,6 +12,7 @@ struct WatchlistComponent {
     watchlist: Watchlist,
 }
 
+#[derive(Clone, Copy)]
 enum Subscription {
     Watch,
     Ignore,
@@ -37,7 +40,77 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
 
     let mut watchlist = WatchlistComponent { watchlist };
 
-    todo!()
+    let handle = ctx
+        .send(|msg| msg.components(replace_builder_with(watchlist.render())))
+        .await?;
+
+    let mut actions = handle
+        .message()
+        .await?
+        .await_component_interactions(&ctx.serenity_context().shard)
+        .build();
+
+    let res = loop {
+        let sleep = tokio::time::sleep(Duration::from_secs(2 * 60));
+        tokio::pin!(sleep);
+
+        let action = tokio::select! {
+            Some(action) = actions.next() => action,
+            _ = sleep => break None,
+        };
+
+        action.defer(ctx).await?;
+
+        let command = match action.data.custom_id.parse::<ComponentAction>() {
+            Ok(command) => command,
+            Err(err) => {
+                log::warn!("An error ocurred parsing a component command: {err}");
+                continue;
+            }
+        };
+
+        if let ComponentStatus::Complete(watchlist) = watchlist.execute(command) {
+            break Some(watchlist);
+        }
+
+        handle
+            .edit(ctx, |msg| {
+                msg.components(replace_builder_with(watchlist.render()))
+            })
+            .await?;
+    };
+
+    actions.stop();
+
+    // clear the components
+    handle
+        .edit(ctx, |msg| {
+            msg.components(|components| components.set_action_rows(vec![]))
+        })
+        .await?;
+
+    let Some(watchlist) = res else {
+        handle.edit(ctx, |msg| {
+            msg.content("Interaction timed out, try again...")
+        }).await?;
+
+        return Ok(());
+    };
+
+    if let Err(err) = update_watchlist(&ctx.data().pool, watchlist).await {
+        log::error!("An error ocurred trying to update watchlist: {err}");
+        handle
+            .edit(ctx, |msg| msg.content("A database error ocurred."))
+            .await?;
+
+        return Ok(());
+    }
+
+    handle
+        .edit(ctx, |msg| msg.content("Watchlist updated."))
+        .await?;
+
+    Ok(())
 }
 
 /// Check your watch list
@@ -54,7 +127,7 @@ pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
             AND a.floor_end = e.floor_end
         WHERE a.user_id = $1
         ORDER BY a.floor_start, a.floor_end
-        "
+        ",
     )
     .bind(ctx.author().id.0 as i64)
     .fetch_all(&ctx.data().pool)
@@ -84,7 +157,10 @@ pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-async fn load_watchlist(pool: &sqlx::PgPool, user_id: serenity::UserId) -> Result<Watchlist, sqlx::Error> {
+async fn load_watchlist(
+    pool: &sqlx::PgPool,
+    user_id: serenity::UserId,
+) -> Result<Watchlist, sqlx::Error> {
     use sqlx::Row;
 
     #[derive(sqlx::FromRow)]
@@ -118,7 +194,7 @@ async fn load_watchlist(pool: &sqlx::PgPool, user_id: serenity::UserId) -> Resul
             AND e.floor_end = a.floor_end
             AND a.user_id = $1
         ORDER BY e.floor_start + e.floor_end, e.floor_start
-        "
+        ",
     )
     .bind(user_id.0 as i64)
     .fetch(pool);
@@ -130,6 +206,109 @@ async fn load_watchlist(pool: &sqlx::PgPool, user_id: serenity::UserId) -> Resul
     Ok(watchlist)
 }
 
+async fn update_watchlist(pool: &sqlx::PgPool, watchlist: &Watchlist) -> Result<(), sqlx::Error> {
+    Ok(())
+}
+
 const ESCALATOR_BUTTON_ID_PREFIX: &str = "ALERTS-ESCALATOR-";
 const SUBMIT_BUTTON_ID: &str = "ALERTS-SUBMIT";
 const SUBMIT_BUTTON_EMOJI: char = '💾';
+
+enum ComponentStatus<T> {
+    Continue,
+    Complete(T),
+}
+
+enum ComponentAction {
+    Toggle(EscalatorFloors),
+    Submit,
+}
+
+impl WatchlistComponent {
+    fn render(&self) -> serenity::CreateComponents {
+        let mut action_rows = self
+            .watchlist
+            .iter()
+            .chunks(4)
+            .into_iter()
+            .map(|row| {
+                let mut action_row = serenity::CreateActionRow::default();
+
+                for (&floors, &sub) in row {
+                    let floor_label = format!("{}-{}", floors.start, floors.end);
+                    let id = format!("{ESCALATOR_BUTTON_ID_PREFIX}{floor_label}");
+
+                    let style = match sub {
+                        Subscription::Watch => serenity::ButtonStyle::Primary,
+                        Subscription::Ignore => serenity::ButtonStyle::Secondary,
+                    };
+
+                    action_row.create_button(|button| {
+                        button.label(floor_label).custom_id(id).style(style)
+                    });
+                }
+
+                action_row
+            })
+            .collect_vec();
+
+        action_rows.last_mut().unwrap().create_button(|button| {
+            button
+                .label("Save List")
+                .custom_id(SUBMIT_BUTTON_ID)
+                .style(serenity::ButtonStyle::Success)
+                .emoji(SUBMIT_BUTTON_EMOJI)
+        });
+
+        let mut components = serenity::CreateComponents::default();
+
+        components.set_action_rows(action_rows);
+
+        components
+    }
+
+    fn execute(&mut self, command: ComponentAction) -> ComponentStatus<&Watchlist> {
+        match command {
+            ComponentAction::Submit => ComponentStatus::Complete(&self.watchlist),
+            ComponentAction::Toggle(floors) => {
+                if let Some(sub) = self.watchlist.get_mut(&floors) {
+                    sub.toggle();
+                }
+
+                ComponentStatus::Continue
+            }
+        }
+    }
+}
+
+impl Subscription {
+    fn toggle(&mut self) {
+        match self {
+            Self::Watch => *self = Self::Ignore,
+            Self::Ignore => *self = Self::Watch,
+        }
+    }
+}
+
+impl FromStr for ComponentAction {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some(floors) = s.strip_prefix(ESCALATOR_BUTTON_ID_PREFIX) {
+            let (start, end) = floors
+                .split_once('-')
+                .ok_or_else(|| anyhow::anyhow!("Invalid escalator"))?;
+
+            let start = start.parse::<u8>()?;
+            let end = end.parse::<u8>()?;
+
+            return Ok(ComponentAction::Toggle(EscalatorFloors { start, end }));
+        }
+
+        if s == SUBMIT_BUTTON_ID {
+            return Ok(ComponentAction::Submit);
+        }
+
+        anyhow::bail!("Unknown command");
+    }
+}
