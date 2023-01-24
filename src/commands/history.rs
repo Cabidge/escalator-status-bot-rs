@@ -61,7 +61,7 @@ async fn remove(ctx: Context<'_>) -> Result<(), Error> {
     .await;
 
     let msg = match res {
-        Ok(_) => format!("Removed history channel"),
+        Ok(_) => String::from("Removed history channel"),
         Err(err) => {
             log::warn!("An error ocurred while removing the history channel: {err}");
             String::from("A database error ocurred.")
