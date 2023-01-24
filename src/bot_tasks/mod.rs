@@ -7,5 +7,5 @@ pub trait BotTask {
     type Data;
 
     fn setup(&self, framework: Weak<poise::Framework<Data, Error>>) -> Option<Data>;
-    fn begin(self, data: Data) -> JoinHandle<()>;
+    fn begin(self, data: Self::Data) -> JoinHandle<()>;
 }
