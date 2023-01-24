@@ -21,6 +21,7 @@ shuttle-persist = "0.8.0"
 shuttle-secrets = "0.8.0"
 shuttle-service = "0.8.0"
 shuttle-shared-db = { version = "0.8.0", features = ["postgres"] }
+smallvec = "1.10.0"
 sqlx = { version = "0.6.2", features = ["runtime-tokio-native-tls", "postgres"] }
 tokio = { version = "1", features = ["full"] }
 

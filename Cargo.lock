@@ -462,6 +462,7 @@ dependencies = [
  "shuttle-secrets",
  "shuttle-service",
  "shuttle-shared-db",
+ "smallvec",
  "sqlx",
  "tokio",
 ]
