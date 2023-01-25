@@ -49,7 +49,7 @@ async fn init(
 
                 let shard_manager = Arc::clone(framework.shard_manager());
 
-                migration::migrate_to_sqlx(&persist, &pool, &ctx).await;
+                migration::migrate_to_sqlx(&persist, &pool, ctx).await;
 
                 Ok(Data::new(shard_manager, pool))
             })
