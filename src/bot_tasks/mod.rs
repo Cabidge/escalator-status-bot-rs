@@ -1,7 +1,9 @@
+pub mod announce;
+
 use crate::prelude::*;
 
-use std::{sync::Weak, process::Termination};
 use poise::async_trait;
+use std::{process::Termination, sync::Weak};
 
 #[async_trait]
 pub trait BotTask: Send + Sync {

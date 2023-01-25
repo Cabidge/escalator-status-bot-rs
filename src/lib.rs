@@ -5,7 +5,7 @@ mod generate;
 mod migration;
 mod prelude;
 
-use bot_tasks::*;
+use bot_tasks::{*, announce::AnnounceTask};
 use shuttle_service::error::CustomError;
 use std::{process::Termination, sync::Arc};
 use tokio::task;
@@ -58,7 +58,8 @@ async fn init(
         .await
         .map_err(anyhow::Error::new)?;
 
-    let bot = EscalatorBot::new(framework);
+    let bot = EscalatorBot::new(framework)
+        .add_task(AnnounceTask::default());
 
     Ok(bot)
 }
