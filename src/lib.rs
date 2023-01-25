@@ -7,7 +7,7 @@ mod prelude;
 
 use bot_tasks::*;
 use shuttle_service::error::CustomError;
-use std::{sync::Arc, process::Termination};
+use std::{process::Termination, sync::Arc};
 use tokio::task;
 
 use prelude::*;
@@ -76,9 +76,16 @@ impl EscalatorBot {
         let handle = tokio::spawn(async move {
             if let Some(data) = task.setup(framework).await {
                 let code = task.run(data).await.report();
-                log::debug!("Task {} failed with exit code: {:?}", std::any::type_name::<T>(), code)
+                log::debug!(
+                    "Task {} failed with exit code: {:?}",
+                    std::any::type_name::<T>(),
+                    code
+                )
             } else {
-                log::error!("Faield to run setup for bot task: {}", std::any::type_name::<T>());
+                log::error!(
+                    "Faield to run setup for bot task: {}",
+                    std::any::type_name::<T>()
+                );
             }
         });
 
