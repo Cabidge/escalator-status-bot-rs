@@ -7,10 +7,10 @@ use std::fmt::Display;
 
 #[derive(Clone)]
 pub struct UserReport {
-    reporter: Option<serenity::UserId>,
-    escalators: EscalatorInput,
-    affected_escalators: SmallVec<[EscalatorFloors; 2]>,
-    new_status: Status,
+    pub reporter: Option<serenity::UserId>,
+    pub escalators: EscalatorInput,
+    pub affected_escalators: SmallVec<[EscalatorFloors; 2]>,
+    pub new_status: Status,
 }
 
 impl Display for UserReport {
