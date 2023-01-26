@@ -136,12 +136,8 @@ pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
     let msg = match res {
         Ok(watchlist) => {
             let body = watchlist
-                .into_iter()
-                .map(|escalator| {
-                    let emoji = escalator.status.emoji();
-                    let EscalatorFloors { start, end } = escalator.floors;
-                    format!("{emoji} {}-{}", start, end)
-                })
+                .iter()
+                .map(Escalator::to_string)
                 .join("\n");
 
             format!("**Your Watch List:**```\n{body}```")
@@ -290,8 +286,7 @@ impl WatchlistComponent {
                 let mut action_row = serenity::CreateActionRow::default();
 
                 for (&floors, &sub) in row {
-                    let floor_label = format!("{}-{}", floors.start, floors.end);
-                    let id = format!("{ESCALATOR_BUTTON_ID_PREFIX}{floor_label}");
+                    let id = format!("{ESCALATOR_BUTTON_ID_PREFIX}{floors}");
 
                     let style = match sub {
                         Subscription::Watch => serenity::ButtonStyle::Primary,
@@ -299,7 +294,7 @@ impl WatchlistComponent {
                     };
 
                     action_row.create_button(|button| {
-                        button.label(floor_label).custom_id(id).style(style)
+                        button.label(floors).custom_id(id).style(style)
                     });
                 }
 
