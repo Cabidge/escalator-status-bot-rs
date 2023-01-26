@@ -25,6 +25,11 @@ impl Data {
         }
     }
 
+    /// Attempts to send a value, not creating a Sender if no Receivers exist.
+    pub fn send_message<T: 'static + Clone + Send + Sync>(&self, value: T) {
+        let _ = self.channels.lock().try_send(value).ok();
+    }
+
     pub fn sender<T: 'static + Clone + Send + Sync>(&self) -> broadcast::Sender<T> {
         self.channels.lock().sender()
     }
