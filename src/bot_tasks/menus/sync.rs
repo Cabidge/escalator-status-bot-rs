@@ -24,9 +24,9 @@ impl BotTask for SyncTask {
     ) -> Option<Self::Data> {
         let framework = framework.upgrade()?;
 
-        let data = framework.user_data().await;
-
         let cache_http = Arc::clone(&framework.client().cache_and_http);
+
+        let data = framework.user_data().await;
 
         Some(TaskData {
             pool: data.pool.clone(),
