@@ -105,13 +105,13 @@ pub fn nounify_escalators(escalators: &[EscalatorFloors]) -> String {
     }
 
     if escalators.len() == 1 {
-        return format!("The {} escalator", nounify_escalator(escalators[0]));
+        return format!("The `{}` escalator", escalators[0]);
     }
 
     // how many escalators there are not including the first and last
     let mid_count = escalators.len() - 2;
 
-    let mut escalators = escalators.iter().copied().map(nounify_escalator);
+    let mut escalators = escalators.iter().copied().map(|escalator| format!("`{escalator}`"));
     let mut noun = format!("The {}", escalators.next().unwrap());
 
     for escalator in escalators.by_ref().take(mid_count) {
@@ -121,11 +121,6 @@ pub fn nounify_escalators(escalators: &[EscalatorFloors]) -> String {
     noun.push_str(&format!(", and {} escalators", escalators.next().unwrap()));
 
     noun
-}
-
-/// Turn an escalator into a format that could be put into a message.
-fn nounify_escalator(floors: EscalatorFloors) -> String {
-    format!("`{}-{}`", floors.start, floors.end)
 }
 
 /// Generates a message of a list of recent reports.
