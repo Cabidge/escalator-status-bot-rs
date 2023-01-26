@@ -190,6 +190,55 @@ async fn commit_report(
     pool: &sqlx::PgPool,
     report: Report,
 ) -> Result<smallvec::SmallVec<[EscalatorFloors; 2]>, sqlx::Error> {
+    let status = report.status;
+
+    match report.escalators {
+        EscalatorInput::All => report_all(pool, status).await,
+        EscalatorInput::Direct(start, end) => {
+            let floors = EscalatorFloors::new(start, end);
+            let escalator = Escalator { floors, status };
+
+            Ok(if report_escalator(pool, escalator).await? {
+                smallvec::smallvec![floors]
+            } else {
+                smallvec::smallvec![]
+            })
+        }
+        EscalatorInput::Pair(start, end) => {
+            let mut transaction = pool.begin().await?;
+
+            let mut escalators = smallvec::smallvec![];
+            for (start, end) in [(start, end), (end, start)] {
+                let floors = EscalatorFloors::new(start, end);
+                let escalator = Escalator { floors, status };
+
+                if report_escalator(&mut transaction, escalator).await? {
+                    escalators.push(floors);
+                }
+            }
+
+            transaction.commit().await?;
+
+            Ok(escalators)
+        }
+    }
+}
+
+/// Updates every escalator's status,
+/// returning all affected escalators.
+async fn report_all(
+    pool: &sqlx::PgPool,
+    status: Status,
+) -> Result<smallvec::SmallVec<[EscalatorFloors; 2]>, sqlx::Error> {
+    todo!()
+}
+
+/// Attempts to update a specific escalator's status,
+/// returning whether or not the escalator exists and if it changed the status.
+async fn report_escalator(
+    pool: impl sqlx::Executor<'_, Database = sqlx::Postgres>,
+    escalator: Escalator,
+) -> Result<bool, sqlx::Error> {
     todo!()
 }
 
