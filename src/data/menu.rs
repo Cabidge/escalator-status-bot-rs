@@ -6,6 +6,7 @@ pub struct MenuId {
     pub message: serenity::MessageId,
 }
 
+#[derive(Clone)]
 pub enum MenuUpdate {
     Create(MenuId, serenity::Message),
     Delete(MenuId),
