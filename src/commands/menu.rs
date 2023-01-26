@@ -65,10 +65,7 @@ async fn init(ctx: Context<'_>) -> Result<(), Error> {
         message: message_id,
     };
 
-    let _ = ctx.data()
-        .sender::<MenuUpdate>()
-        .send(MenuUpdate::Create(menu_id, menu))
-        .ok();
+    ctx.data().send_message(MenuUpdate::Create(menu_id, menu));
 
     ctx.say("Initialized report menu.").await?;
 
