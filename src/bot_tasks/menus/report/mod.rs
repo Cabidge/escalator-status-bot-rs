@@ -1,9 +1,11 @@
+mod component;
+
 use crate::{prelude::*, bot_tasks::BotTask, data::{report::UserReport, escalator_input::EscalatorInput, status::Status}, generate::REPORT_BUTTON_ID, ComponentMessage};
 
 use futures::{StreamExt, TryStreamExt};
 use poise::async_trait;
 use tokio::sync::broadcast::{self, error::RecvError};
-use std::{sync::Arc, str::FromStr, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 pub struct ReportTask;
 
@@ -14,22 +16,10 @@ pub struct TaskData {
     cache_http: Arc<serenity::CacheAndHttp>,
 }
 
-struct ReportComponent {
-
-}
-
 #[derive(Clone, Copy)]
-struct Report {
+pub struct Report {
     escalators: EscalatorInput,
     status: Status,
-}
-
-enum ComponentStatus<T> {
-    Continue,
-    Complete(T),
-}
-
-enum ComponentAction {
 }
 
 #[async_trait]
@@ -86,7 +76,7 @@ async fn handle_report(
     event: &ComponentMessage,
     reporter: broadcast::Sender<UserReport>,
 ) -> Result<(), Error> {
-    let mut report = ReportComponent::new();
+    let mut report = component::ReportComponent::new();
 
     event.interaction
         .create_interaction_response(&http, |res| {
@@ -113,7 +103,7 @@ async fn handle_report(
 
         action.defer(http).await?;
 
-        let command = match action.data.custom_id.parse::<ComponentAction>() {
+        let command = match action.data.custom_id.parse::<component::ComponentAction>() {
             Ok(command) => command,
             Err(err) => {
                 log::warn!("An error ocurred parsing a component command: {err}");
@@ -121,7 +111,7 @@ async fn handle_report(
             }
         };
 
-        if let ComponentStatus::Complete(report) = report.execute(command) {
+        if let component::ComponentStatus::Complete(report) = report.execute(command) {
             break Some(report);
         }
 
@@ -266,28 +256,4 @@ async fn report_escalator(
     .fetch_optional(executor)
     .await
     .map(|opt| opt.is_some())
-}
-
-impl ReportComponent {
-    fn new() -> Self {
-        Self {
-
-        }
-    }
-
-    fn render(&self) -> serenity::CreateComponents {
-        todo!()
-    }
-
-    fn execute(&mut self, command: ComponentAction) -> ComponentStatus<Report> {
-        todo!()
-    }
-}
-
-impl FromStr for ComponentAction {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
-    }
 }
