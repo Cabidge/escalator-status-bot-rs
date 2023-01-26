@@ -1,6 +1,6 @@
 use crate::{prelude::*, bot_tasks::BotTask, data::{report::UserReport, escalator_input::EscalatorInput, status::Status}, generate::REPORT_BUTTON_ID, ComponentMessage};
 
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use poise::async_trait;
 use tokio::sync::broadcast::{self, error::RecvError};
 use std::{sync::Arc, str::FromStr, time::Duration};
@@ -230,7 +230,18 @@ async fn report_all(
     pool: &sqlx::PgPool,
     status: Status,
 ) -> Result<smallvec::SmallVec<[EscalatorFloors; 2]>, sqlx::Error> {
-    todo!()
+    sqlx::query_as::<_, EscalatorFloors>(
+        "
+        UPDATE escalators
+        SET current_status = $1
+        WHERE current_status <> $1
+        RETURNING floor_start, floor_end
+        "
+    )
+    .bind(status)
+    .fetch(pool)
+    .try_collect()
+    .await
 }
 
 /// Attempts to update a specific escalator's status,
