@@ -75,5 +75,35 @@ async fn init(ctx: Context<'_>) -> Result<(), Error> {
 /// (dev-only) Remove the status menu.
 #[poise::command(slash_command, ephemeral = true)]
 async fn clear(ctx: Context<'_>) -> Result<(), Error> {
-    todo!()
+    ctx.defer_ephemeral().await?;
+
+    let Some(guild_id) = ctx.guild_id() else {
+        ctx.say("`/menu clear` must be used in a guild.").await?;
+        return Ok(());
+    };
+
+    let Some((channel_id, message_id)) = sqlx::query_as::<_, (i64, i64)>(
+        "
+        DELETE FROM menu_messages
+        WHERE guild_id = $1
+        RETURNING channel_id, message_id
+        "
+    )
+    .bind(guild_id.0 as i64)
+    .fetch_optional(&ctx.data().pool)
+    .await? else {
+        ctx.say("No report menu exists in this server.").await?;
+        return Ok(());
+    };
+
+    let menu_id = MenuId {
+        channel: serenity::ChannelId(channel_id as u64),
+        message: serenity::MessageId(message_id as u64),
+    };
+
+    ctx.data().send_message(MenuUpdate::Delete(menu_id));
+
+    ctx.say("Deleted report menu").await?;
+
+    Ok(())
 }
