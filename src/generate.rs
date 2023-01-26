@@ -111,7 +111,10 @@ pub fn nounify_escalators(escalators: &[EscalatorFloors]) -> String {
     // how many escalators there are not including the first and last
     let mid_count = escalators.len() - 2;
 
-    let mut escalators = escalators.iter().copied().map(|escalator| format!("`{escalator}`"));
+    let mut escalators = escalators
+        .iter()
+        .copied()
+        .map(|escalator| format!("`{escalator}`"));
     let mut noun = format!("The {}", escalators.next().unwrap());
 
     for escalator in escalators.by_ref().take(mid_count) {
@@ -169,7 +172,7 @@ pub async fn menu_status(pool: &sqlx::PgPool) -> Result<String, sqlx::Error> {
         FROM escalators
         ORDER BY floor_start + floor_end,
             floor_start
-        "
+        ",
     )
     .fetch_all(pool)
     .await?

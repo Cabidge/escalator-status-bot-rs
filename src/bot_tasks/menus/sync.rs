@@ -1,4 +1,4 @@
-use crate::{prelude::*, bot_tasks::BotTask, data::report::UserReport, generate};
+use crate::{bot_tasks::BotTask, data::report::UserReport, generate, prelude::*};
 
 use futures::future::join_all;
 use poise::async_trait;
@@ -55,7 +55,7 @@ async fn sync_menus(data: &TaskData) -> Result<(), sqlx::Error> {
         "
         SELECT channel_id, message_id
         FROM menu_messages
-        "
+        ",
     )
     .fetch_all(&data.pool)
     .await?;
@@ -69,20 +69,25 @@ async fn sync_menus(data: &TaskData) -> Result<(), sqlx::Error> {
 
     let mut builder = serenity::EditMessage::default();
 
-    builder.content(statuses)
+    builder
+        .content(statuses)
         .set_components(generate::menu_buttons());
 
-    let map = Arc::new(serenity::json::Value::from(serenity::json::hashmap_to_json_map(builder.0)));
+    let map = Arc::new(serenity::json::Value::from(
+        serenity::json::hashmap_to_json_map(builder.0),
+    ));
 
-    let update_all = menus.into_iter()
-        .map(|(channel_id, message_id)| {
-            let http = Arc::clone(&data.cache_http.http);
-            let map = Arc::clone(&map);
+    let update_all = menus.into_iter().map(|(channel_id, message_id)| {
+        let http = Arc::clone(&data.cache_http.http);
+        let map = Arc::clone(&map);
 
-            async move {
-                let _ = http.edit_message(channel_id as u64, message_id as u64, &map).await.ok();
-            }
-        });
+        async move {
+            let _ = http
+                .edit_message(channel_id as u64, message_id as u64, &map)
+                .await
+                .ok();
+        }
+    });
 
     join_all(update_all).await;
 

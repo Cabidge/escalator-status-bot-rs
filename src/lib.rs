@@ -5,7 +5,12 @@ mod generate;
 mod migration;
 mod prelude;
 
-use bot_tasks::{alert::AlertTask, announce::AnnounceTask, BotTask, menus::{sync::SyncTask, report::ReportTask}};
+use bot_tasks::{
+    alert::AlertTask,
+    announce::AnnounceTask,
+    menus::{report::ReportTask, sync::SyncTask},
+    BotTask,
+};
 use futures::future::BoxFuture;
 use poise::serenity_prelude::{MessageComponentInteraction, ShardMessenger};
 use shuttle_service::error::CustomError;
@@ -135,7 +140,8 @@ fn event_handler<'a>(
 
     if let poise::Event::InteractionCreate {
         interaction: Interaction::MessageComponent(interaction),
-    } = event {
+    } = event
+    {
         if interaction.message.author.id == ctx.bot_id {
             let create_value = || {
                 let message = ComponentMessage {
@@ -146,7 +152,8 @@ fn event_handler<'a>(
                 Arc::new(message)
             };
 
-            ctx.user_data.send_message_with::<Arc<ComponentMessage>, _>(create_value);
+            ctx.user_data
+                .send_message_with::<Arc<ComponentMessage>, _>(create_value);
         }
     }
 

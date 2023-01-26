@@ -135,10 +135,7 @@ pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
 
     let msg = match res {
         Ok(watchlist) => {
-            let body = watchlist
-                .iter()
-                .map(Escalator::to_string)
-                .join("\n");
+            let body = watchlist.iter().map(Escalator::to_string).join("\n");
 
             format!("**Your Watch List:**```\n{body}```")
         }
@@ -293,9 +290,8 @@ impl WatchlistComponent {
                         Subscription::Ignore => serenity::ButtonStyle::Secondary,
                     };
 
-                    action_row.create_button(|button| {
-                        button.label(floors).custom_id(id).style(style)
-                    });
+                    action_row
+                        .create_button(|button| button.label(floors).custom_id(id).style(style));
                 }
 
                 action_row

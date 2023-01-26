@@ -1,10 +1,16 @@
-use crate::{prelude::*, bot_tasks::BotTask, generate::{INFO_BUTTON_ID, REPORT_EMOJI}, data::status::Status, ComponentMessage};
+use crate::{
+    bot_tasks::BotTask,
+    data::status::Status,
+    generate::{INFO_BUTTON_ID, REPORT_EMOJI},
+    prelude::*,
+    ComponentMessage,
+};
 
-use indexmap::{IndexMap, indexmap};
+use indexmap::{indexmap, IndexMap};
 use lazy_static::lazy_static;
 use poise::async_trait;
-use tokio::sync::broadcast::{self, error::RecvError};
 use std::sync::Arc;
+use tokio::sync::broadcast::{self, error::RecvError};
 
 pub struct ReportTask;
 
@@ -78,13 +84,14 @@ impl BotTask for ReportTask {
                 }
             };
 
-            event.interaction
+            event
+                .interaction
                 .create_interaction_response(&data.cache_http.http, |res| {
                     res.interaction_response_data(|data| {
                         data.embed(|embed| {
-                            embed
-                                .title("What The Heck Does All Of This Mean?")
-                                .fields(INFO_FIELDS.iter().map(|(title, desc)| (title, desc, false)))
+                            embed.title("What The Heck Does All Of This Mean?").fields(
+                                INFO_FIELDS.iter().map(|(title, desc)| (title, desc, false)),
+                            )
                         })
                         .ephemeral(true)
                     })

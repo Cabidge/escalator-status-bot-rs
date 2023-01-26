@@ -3,23 +3,18 @@ use crate::prelude::*;
 use super::Report;
 use std::str::FromStr;
 
-pub struct ReportComponent {
-
-}
+pub struct ReportComponent {}
 
 pub enum ComponentStatus<T> {
     Continue,
     Complete(T),
 }
 
-pub enum ComponentAction {
-}
+pub enum ComponentAction {}
 
 impl ReportComponent {
     pub fn new() -> Self {
-        Self {
-
-        }
+        Self {}
     }
 
     pub fn render(&self) -> serenity::CreateComponents {

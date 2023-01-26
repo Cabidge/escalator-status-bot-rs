@@ -1,4 +1,8 @@
-use crate::{prelude::*, generate, data::menu::{MenuUpdate, MenuId}};
+use crate::{
+    data::menu::{MenuId, MenuUpdate},
+    generate,
+    prelude::*,
+};
 
 use poise::serenity_prelude::CacheHttp;
 
@@ -24,7 +28,7 @@ async fn init(ctx: Context<'_>) -> Result<(), Error> {
         SELECT 1
         FROM menu_messages
         WHERE guild_id = $1
-        "
+        ",
     )
     .bind(guild_id.0 as i64)
     .fetch_optional(&mut transaction)
@@ -32,7 +36,8 @@ async fn init(ctx: Context<'_>) -> Result<(), Error> {
     .is_some();
 
     if menu_exists {
-        ctx.say("Menu already exists, use `/menu clear` to delete it.").await?;
+        ctx.say("Menu already exists, use `/menu clear` to delete it.")
+            .await?;
         return Ok(());
     }
 
@@ -41,10 +46,11 @@ async fn init(ctx: Context<'_>) -> Result<(), Error> {
     let statuses = generate::menu_status(&ctx.data().pool).await?;
     let menu_buttons = generate::menu_buttons();
 
-    let menu = channel_id.send_message(ctx, |msg| {
-        msg.content(statuses)
-            .set_components(menu_buttons)
-    }).await?;
+    let menu = channel_id
+        .send_message(ctx, |msg| {
+            msg.content(statuses).set_components(menu_buttons)
+        })
+        .await?;
 
     let message_id = menu.id;
 
@@ -52,7 +58,7 @@ async fn init(ctx: Context<'_>) -> Result<(), Error> {
         "
         INSERT INTO menu_messages (guild_id, channel_id, message_id)
         VALUES ($1, $2, $3)
-        "
+        ",
     )
     .bind(guild_id.0 as i64)
     .bind(channel_id.0 as i64)

@@ -18,7 +18,10 @@ impl AnyChannels {
 
     /// Tries to send out a given value,
     /// but doesn't generate a Sender if one doesn't exist already.
-    pub fn try_send<T: 'static + Clone + Send + Sync>(&self, value: T) -> Result<usize, broadcast::error::SendError<T>> {
+    pub fn try_send<T: 'static + Clone + Send + Sync>(
+        &self,
+        value: T,
+    ) -> Result<usize, broadcast::error::SendError<T>> {
         match self.try_sender() {
             Some(sender) => sender.send(value),
             None => Err(broadcast::error::SendError(value)),
@@ -27,12 +30,10 @@ impl AnyChannels {
 
     /// Tries to obtain a sender reference, returns None if not exists.
     pub fn try_sender<T: 'static + Clone + Send + Sync>(&self) -> Option<&broadcast::Sender<T>> {
-        self.channels
-            .get(&TypeId::of::<T>())
-            .map(|any| {
-                any.downcast_ref()
-                    .expect("The TypeId MUST map to a broadcast::Sender of the same type")
-            })
+        self.channels.get(&TypeId::of::<T>()).map(|any| {
+            any.downcast_ref()
+                .expect("The TypeId MUST map to a broadcast::Sender of the same type")
+        })
     }
 
     pub fn sender<T: 'static + Clone + Send + Sync>(&mut self) -> broadcast::Sender<T> {

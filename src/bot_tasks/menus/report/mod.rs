@@ -1,11 +1,17 @@
 mod component;
 
-use crate::{prelude::*, bot_tasks::BotTask, data::{report::UserReport, escalator_input::EscalatorInput, status::Status}, generate::REPORT_BUTTON_ID, ComponentMessage};
+use crate::{
+    bot_tasks::BotTask,
+    data::{escalator_input::EscalatorInput, report::UserReport, status::Status},
+    generate::REPORT_BUTTON_ID,
+    prelude::*,
+    ComponentMessage,
+};
 
 use futures::{StreamExt, TryStreamExt};
 use poise::async_trait;
-use tokio::sync::broadcast::{self, error::RecvError};
 use std::{sync::Arc, time::Duration};
+use tokio::sync::broadcast::{self, error::RecvError};
 
 pub struct ReportTask;
 
@@ -78,7 +84,8 @@ async fn handle_report(
 ) -> Result<(), Error> {
     let mut report = component::ReportComponent::new();
 
-    event.interaction
+    event
+        .interaction
         .create_interaction_response(&http, |res| {
             res.interaction_response_data(|data| {
                 data.set_components(report.render()).ephemeral(true)
@@ -86,7 +93,8 @@ async fn handle_report(
         })
         .await?;
 
-    let mut actions = event.interaction
+    let mut actions = event
+        .interaction
         .get_interaction_response(http)
         .await?
         .await_component_interactions(&event.shard)
@@ -117,18 +125,20 @@ async fn handle_report(
 
         let replace_components = replace_builder_with(report.render());
 
-        event.interaction
-            .edit_original_interaction_response(http, |res| {
-                res.components(replace_components)
-            })
+        event
+            .interaction
+            .edit_original_interaction_response(http, |res| res.components(replace_components))
             .await?;
     };
 
     actions.stop();
 
-    event.interaction.edit_original_interaction_response(http, |msg| {
-        msg.components(|components| components.set_action_rows(vec![]))
-    }).await?;
+    event
+        .interaction
+        .edit_original_interaction_response(http, |msg| {
+            msg.components(|components| components.set_action_rows(vec![]))
+        })
+        .await?;
 
     let Some(report) = res else {
         log::debug!("Interaction timed out.");
@@ -145,9 +155,12 @@ async fn handle_report(
         Err(err) => {
             log::error!("An error ocurred trying to update statuses: {err}");
 
-            event.interaction.edit_original_interaction_response(http, |msg| {
-                msg.content("A database error ocurred.")
-            }).await?;
+            event
+                .interaction
+                .edit_original_interaction_response(http, |msg| {
+                    msg.content("A database error ocurred.")
+                })
+                .await?;
 
             return Ok(());
         }
@@ -159,9 +172,10 @@ async fn handle_report(
         report.escalators.message_noun(),
     );
 
-    event.interaction.edit_original_interaction_response(http, |msg| {
-        msg.content(message)
-    }).await?;
+    event
+        .interaction
+        .edit_original_interaction_response(http, |msg| msg.content(message))
+        .await?;
 
     let full_report = UserReport {
         reporter: Some(event.interaction.user.id),
@@ -174,7 +188,6 @@ async fn handle_report(
 
     Ok(())
 }
-
 
 async fn commit_report(
     pool: &sqlx::PgPool,
@@ -226,7 +239,7 @@ async fn report_all(
         SET current_status = $1
         WHERE current_status <> $1
         RETURNING floor_start, floor_end
-        "
+        ",
     )
     .bind(status)
     .fetch(pool)
@@ -248,7 +261,7 @@ async fn report_escalator(
         AND floor_start = $2
         AND floor_end = $3
         RETURNING 1
-        "
+        ",
     )
     .bind(escalator.status)
     .bind(escalator.floors.start as i16)
