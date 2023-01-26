@@ -1,5 +1,7 @@
 use crate::{prelude::*, generate, data::menu::{MenuUpdate, MenuId}};
 
+use poise::serenity_prelude::CacheHttp;
+
 #[poise::command(slash_command, subcommands("init", "clear"), owners_only)]
 pub async fn menu(_ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
@@ -100,6 +102,15 @@ async fn clear(ctx: Context<'_>) -> Result<(), Error> {
         channel: serenity::ChannelId(channel_id as u64),
         message: serenity::MessageId(message_id as u64),
     };
+
+    let res = ctx
+        .http()
+        .delete_message(channel_id as u64, message_id as u64)
+        .await;
+
+    if let Err(err) = res {
+        log::warn!("An error ocurred trying to delete report menu: {err}");
+    }
 
     ctx.data().send_message(MenuUpdate::Delete(menu_id));
 
