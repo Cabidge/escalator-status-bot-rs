@@ -19,13 +19,20 @@ impl AnyChannels {
     /// Tries to send out a given value,
     /// but doesn't generate a Sender if one doesn't exist already.
     pub fn try_send<T: 'static + Clone + Send + Sync>(&self, value: T) -> Result<usize, broadcast::error::SendError<T>> {
-        let Some(sender) = self.channels.get(&TypeId::of::<T>()) else {
-            return Err(broadcast::error::SendError(value));
-        };
+        match self.try_sender() {
+            Some(sender) => sender.send(value),
+            None => Err(broadcast::error::SendError(value)),
+        }
+    }
 
-        sender.downcast_ref::<broadcast::Sender<T>>()
-            .expect("The TypeId MUST map to a broadcast::Sender of the same type")
-            .send(value)
+    /// Tries to obtain a sender reference, returns None if not exists.
+    pub fn try_sender<T: 'static + Clone + Send + Sync>(&self) -> Option<&broadcast::Sender<T>> {
+        self.channels
+            .get(&TypeId::of::<T>())
+            .map(|any| {
+                any.downcast_ref()
+                    .expect("The TypeId MUST map to a broadcast::Sender of the same type")
+            })
     }
 
     pub fn sender<T: 'static + Clone + Send + Sync>(&mut self) -> broadcast::Sender<T> {
