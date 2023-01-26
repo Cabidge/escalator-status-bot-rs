@@ -182,3 +182,29 @@ pub async fn menu_status(pool: &sqlx::PgPool) -> Result<String, sqlx::Error> {
 
     Ok(format!("**Escalator Statuses:**```\n{statuses}```"))
 }
+
+pub const REPORT_EMOJI: char = '📢';
+pub const REPORT_BUTTON_ID: &str = "REPORT";
+
+pub const INFO_EMOJI: char = '❔';
+pub const INFO_BUTTON_ID: &str = "INFO";
+
+pub fn menu_buttons() -> serenity::CreateComponents {
+    let mut components = serenity::CreateComponents::default();
+
+    components.create_action_row(|row| {
+        row.create_button(|btn| {
+            btn.label("Report")
+                .emoji(REPORT_EMOJI)
+                .style(serenity::ButtonStyle::Primary)
+                .custom_id(REPORT_BUTTON_ID)
+        })
+        .create_button(|btn| {
+            btn.emoji(INFO_EMOJI)
+                .style(serenity::ButtonStyle::Secondary)
+                .custom_id(INFO_BUTTON_ID)
+        })
+    });
+
+    components
+}
