@@ -3,6 +3,8 @@ use crate::{
     prelude::*,
 };
 
+use itertools::Itertools;
+
 pub async fn gist(pool: &sqlx::PgPool) -> Result<serenity::CreateEmbed, sqlx::Error> {
     // -- Setup
 
@@ -138,4 +140,28 @@ pub fn alert(report: &UserReport) -> String {
     let status = report.new_status.as_id_str();
 
     format!("`{emoji}` {noun} {is_are} `{status}`")
+}
+
+/// Generates a message containing the status of every escalator.
+pub async fn menu_status(pool: &sqlx::PgPool) -> Result<String, sqlx::Error> {
+    let statuses = sqlx::query_as::<_, Escalator>(
+        "
+        SELECT floor_start,
+            floor_end,
+            current_status
+        FROM escalators
+        ORDER BY floor_start + floor_end,
+            floor_start
+        "
+    )
+    .fetch_all(pool)
+    .await?
+    .iter()
+    .map(Escalator::to_string)
+    .chunks(2)
+    .into_iter()
+    .map(|mut pair| pair.join(" "))
+    .join("\n");
+
+    Ok(format!("**Escalator Statuses:**```\n{statuses}```"))
 }
