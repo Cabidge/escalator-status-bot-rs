@@ -247,10 +247,25 @@ async fn report_all(
 /// Attempts to update a specific escalator's status,
 /// returning whether or not the escalator exists and if it changed the status.
 async fn report_escalator(
-    pool: impl sqlx::Executor<'_, Database = sqlx::Postgres>,
+    executor: impl sqlx::Executor<'_, Database = sqlx::Postgres>,
     escalator: Escalator,
 ) -> Result<bool, sqlx::Error> {
-    todo!()
+    sqlx::query(
+        "
+        UPDATE escalators
+        SET current_status = $1
+        WHERE current_status <> $1
+        AND floor_start = $2
+        AND floor_end = $3
+        RETURNING 1
+        "
+    )
+    .bind(escalator.status)
+    .bind(escalator.floors.start as i16)
+    .bind(escalator.floors.end as i16)
+    .fetch_optional(executor)
+    .await
+    .map(|opt| opt.is_some())
 }
 
 impl ReportComponent {
