@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{prelude::*, data::report::UserReport, generate};
+use crate::{data::report::UserReport, generate, prelude::*};
 
 use super::BotTask;
 
@@ -74,7 +74,7 @@ impl BotTask for AlertTask {
                     WHERE a.floor_start = r.floor_start
                     AND a.floor_end = r.floor_end
                 )
-                "
+                ",
             )
             .bind(&starts[..])
             .bind(&ends[..])
@@ -90,16 +90,15 @@ impl BotTask for AlertTask {
 
             log::info!("Sending alert messages...");
 
-            let send_all = users.into_iter()
-                .map(|(user_id,)| {
-                    let message = message.clone();
-                    let cache_http = Arc::clone(&data.cache_http);
-                    let user = serenity::UserId(user_id as u64);
-                    async move {
-                        let Ok(dm) = user.create_dm_channel(&cache_http).await else { return };
-                        let _ = dm.say(&cache_http.http, message).await.ok();
-                    }
-                });
+            let send_all = users.into_iter().map(|(user_id,)| {
+                let message = message.clone();
+                let cache_http = Arc::clone(&data.cache_http);
+                let user = serenity::UserId(user_id as u64);
+                async move {
+                    let Ok(dm) = user.create_dm_channel(&cache_http).await else { return };
+                    let _ = dm.say(&cache_http.http, message).await.ok();
+                }
+            });
 
             join_all(send_all).await;
         }

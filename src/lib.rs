@@ -5,7 +5,7 @@ mod generate;
 mod migration;
 mod prelude;
 
-use bot_tasks::{*, announce::AnnounceTask, alert::AlertTask};
+use bot_tasks::{alert::AlertTask, announce::AnnounceTask, *};
 use shuttle_service::error::CustomError;
 use std::{process::Termination, sync::Arc};
 use tokio::task;

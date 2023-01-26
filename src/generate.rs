@@ -1,4 +1,7 @@
-use crate::{data::{status::Status, report::UserReport}, prelude::*};
+use crate::{
+    data::{report::UserReport, status::Status},
+    prelude::*,
+};
 
 pub async fn gist(pool: &sqlx::PgPool) -> Result<serenity::CreateEmbed, sqlx::Error> {
     // -- Setup
