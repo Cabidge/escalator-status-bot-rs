@@ -1,4 +1,4 @@
-use crate::{data::status::Status, prelude::*};
+use crate::{data::{status::Status, report::UserReport}, prelude::*};
 
 pub async fn gist(pool: &sqlx::PgPool) -> Result<serenity::CreateEmbed, sqlx::Error> {
     // -- Setup
@@ -121,4 +121,18 @@ pub fn nounify_escalators(escalators: &[EscalatorFloors]) -> String {
 /// Turn an escalator into a format that could be put into a message.
 fn nounify_escalator(floors: EscalatorFloors) -> String {
     format!("`{}-{}`", floors.start, floors.end)
+}
+
+/// Generates an alert message from a user report.
+pub fn alert(report: &UserReport) -> String {
+    let emoji = report.new_status.emoji();
+    let noun = nounify_escalators(&report.affected_escalators);
+    let is_are = if report.affected_escalators.len() == 1 {
+        "is"
+    } else {
+        "are"
+    };
+    let status = report.new_status.as_id_str();
+
+    format!("`{emoji}` {noun} {is_are} `{status}`")
 }

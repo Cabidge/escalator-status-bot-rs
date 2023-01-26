@@ -1,3 +1,4 @@
+pub mod alert;
 pub mod announce;
 
 use crate::prelude::*;
