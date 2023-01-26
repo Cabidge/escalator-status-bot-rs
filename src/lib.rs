@@ -5,7 +5,7 @@ mod generate;
 mod migration;
 mod prelude;
 
-use bot_tasks::{alert::AlertTask, announce::AnnounceTask, BotTask};
+use bot_tasks::{alert::AlertTask, announce::AnnounceTask, BotTask, menus::{sync::SyncTask, report::ReportTask}};
 use shuttle_service::error::CustomError;
 use std::{process::Termination, sync::Arc};
 use tokio::task;
@@ -60,7 +60,9 @@ async fn init(
 
     let bot = EscalatorBot::new(framework)
         .add_task(AnnounceTask::default())
-        .add_task(AlertTask);
+        .add_task(AlertTask)
+        .add_task(ReportTask)
+        .add_task(SyncTask);
 
     Ok(bot)
 }
