@@ -3,7 +3,6 @@ use crate::{data::report::UserReport, generate, prelude::*};
 use super::BotTask;
 
 use futures::future::join_all;
-use itertools::Itertools;
 use poise::async_trait;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::broadcast, time::Instant};
@@ -81,7 +80,7 @@ impl BotTask for AnnounceTask {
             // get summary of the current escalator statuses
             let mut embed = generate::gist(&data.pool).await?;
 
-            let reports = self.format_reports(reports.into_iter().rev());
+            let reports = generate::announcement(self.max_reports_displayed, reports.into_iter().rev());
 
             embed.timestamp(chrono::Utc::now()).field(
                 "Recent reports (newest first)",
@@ -173,26 +172,5 @@ impl AnnounceTask {
         }
 
         Ok(accumulated)
-    }
-
-    fn format_reports<I>(&self, reports: I) -> String
-    where
-        I: Iterator<Item = UserReport> + ExactSizeIterator,
-    {
-        let mut reports = reports.map(|report| report.to_string());
-
-        if reports.len() <= self.max_reports_displayed {
-            return reports.join("\n");
-        }
-
-        let mut message = String::new();
-        for report in reports.by_ref().take(self.max_reports_displayed - 1) {
-            message.push_str(&report);
-            message.push('\n');
-        }
-
-        message.push_str(&format!("\n*(...and {} more)*", reports.len()));
-
-        message
     }
 }

@@ -128,6 +128,28 @@ fn nounify_escalator(floors: EscalatorFloors) -> String {
     format!("`{}-{}`", floors.start, floors.end)
 }
 
+/// Generates a message of a list of recent reports.
+pub fn announcement<I>(max_reports_displayed: usize, reports: I) -> String
+where
+    I: Iterator<Item = UserReport> + ExactSizeIterator,
+{
+    let mut reports = reports.map(|report| report.to_string());
+
+    if reports.len() <= max_reports_displayed {
+        return reports.join("\n");
+    }
+
+    let mut message = String::new();
+    for report in reports.by_ref().take(max_reports_displayed - 1) {
+        message.push_str(&report);
+        message.push('\n');
+    }
+
+    message.push_str(&format!("\n*(...and {} more)*", reports.len()));
+
+    message
+}
+
 /// Generates an alert message from a user report.
 pub fn alert(report: &UserReport) -> String {
     let emoji = report.new_status.emoji();
