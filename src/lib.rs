@@ -129,10 +129,12 @@ fn event_handler<'a>(
     if let poise::Event::InteractionCreate {
         interaction: Interaction::MessageComponent(interaction),
     } = event {
-        type ComponentMessage = Arc<serenity::MessageComponentInteraction>;
+        if interaction.message.author.id == ctx.bot_id {
+            type ComponentMessage = Arc<serenity::MessageComponentInteraction>;
 
-        let create_value = || { Arc::new(interaction.clone()) };
-        ctx.user_data.send_message_with::<ComponentMessage, _>(create_value);
+            let create_value = || { Arc::new(interaction.clone()) };
+            ctx.user_data.send_message_with::<ComponentMessage, _>(create_value);
+        }
     }
 
     Box::pin(async move { Ok(()) })
