@@ -30,6 +30,16 @@ impl Data {
         let _ = self.channels.read().try_send(value).ok();
     }
 
+    pub fn send_message_with<T: 'static + Clone + Send + Sync, F>(&self, f: F)
+    where
+        F: FnOnce() -> T,
+    {
+        if let Some(sender) = self.channels.read().try_sender() {
+            let value = f();
+            let _ = sender.send(value).ok();
+        }
+    }
+
     pub fn sender<T: 'static + Clone + Send + Sync>(&self) -> broadcast::Sender<T> {
         self.channels.write().sender()
     }
