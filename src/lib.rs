@@ -6,6 +6,7 @@ mod migration;
 mod prelude;
 
 use bot_tasks::{alert::AlertTask, announce::AnnounceTask, BotTask, menus::{sync::SyncTask, report::ReportTask}};
+use futures::future::BoxFuture;
 use shuttle_service::error::CustomError;
 use std::{process::Termination, sync::Arc};
 use tokio::task;
@@ -38,6 +39,7 @@ async fn init(
         .options(poise::FrameworkOptions {
             // add bot commands
             commands: commands::commands(),
+            event_handler,
             ..Default::default()
         })
         .token(token)
@@ -114,4 +116,24 @@ impl shuttle_service::Service for EscalatorBot {
 
         Ok(())
     }
+}
+
+fn event_handler<'a>(
+    _serenity_ctx: &'a serenity::Context,
+    event: &'a poise::Event<'a>,
+    ctx: poise::FrameworkContext<'a, Data, Error>,
+    _data: &'a Data,
+) -> BoxFuture<'a, Result<(), Error>> {
+    use serenity::Interaction;
+
+    if let poise::Event::InteractionCreate {
+        interaction: Interaction::MessageComponent(interaction),
+    } = event {
+        type ComponentMessage = Arc<serenity::MessageComponentInteraction>;
+
+        let create_value = || { Arc::new(interaction.clone()) };
+        ctx.user_data.send_message_with::<ComponentMessage, _>(create_value);
+    }
+
+    Box::pin(async move { Ok(()) })
 }
