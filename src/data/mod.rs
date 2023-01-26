@@ -1,6 +1,7 @@
 pub mod channels;
 pub mod escalator;
 pub mod escalator_input;
+pub mod menu;
 pub mod report;
 pub mod status;
 
