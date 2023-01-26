@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct MenuId {
     pub channel: serenity::ChannelId,
     pub message: serenity::MessageId,
