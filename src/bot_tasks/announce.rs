@@ -80,7 +80,7 @@ impl BotTask for AnnounceTask {
             // get summary of the current escalator statuses
             let mut embed = generate::gist(&data.pool).await?;
 
-            let reports = generate::announcement(self.max_reports_displayed, reports.into_iter().rev());
+            let reports = generate::announcement(self.max_reports_displayed, reports.iter().rev());
 
             embed.timestamp(chrono::Utc::now()).field(
                 "Recent reports (newest first)",

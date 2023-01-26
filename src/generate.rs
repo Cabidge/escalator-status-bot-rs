@@ -124,11 +124,11 @@ pub fn nounify_escalators(escalators: &[EscalatorFloors]) -> String {
 }
 
 /// Generates a message of a list of recent reports.
-pub fn announcement<I>(max_reports_displayed: usize, reports: I) -> String
+pub fn announcement<'a, I>(max_reports_displayed: usize, reports: I) -> String
 where
-    I: Iterator<Item = UserReport> + ExactSizeIterator,
+    I: Iterator<Item = &'a UserReport> + ExactSizeIterator + 'a,
 {
-    let mut reports = reports.map(|report| report.to_string());
+    let mut reports = reports.map(UserReport::to_string);
 
     if reports.len() <= max_reports_displayed {
         return reports.join("\n");
