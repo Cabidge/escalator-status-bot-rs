@@ -1,4 +1,4 @@
-use crate::{prelude::*, bot_tasks::BotTask, generate::{INFO_BUTTON_ID, REPORT_EMOJI}, data::status::Status};
+use crate::{prelude::*, bot_tasks::BotTask, generate::{INFO_BUTTON_ID, REPORT_EMOJI}, data::status::Status, ComponentMessage};
 
 use indexmap::{IndexMap, indexmap};
 use lazy_static::lazy_static;
@@ -8,10 +8,8 @@ use std::sync::Arc;
 
 pub struct ReportTask;
 
-type ComponentMessage = Arc<serenity::MessageComponentInteraction>;
-
 pub struct TaskData {
-    interactions: broadcast::Receiver<ComponentMessage>,
+    interactions: broadcast::Receiver<Arc<ComponentMessage>>,
     cache_http: Arc<serenity::CacheAndHttp>,
 }
 
@@ -70,8 +68,8 @@ impl BotTask for ReportTask {
 
     async fn run(self, mut data: Self::Data) -> Self::Term {
         loop {
-            let interaction = match data.interactions.recv().await {
-                Ok(interaction) if interaction.data.custom_id == INFO_BUTTON_ID => interaction,
+            let event = match data.interactions.recv().await {
+                Ok(event) if event.interaction.data.custom_id == INFO_BUTTON_ID => event,
                 Ok(_) => continue,
                 Err(RecvError::Closed) => return Ok(()),
                 Err(RecvError::Lagged(n)) => {
@@ -80,7 +78,7 @@ impl BotTask for ReportTask {
                 }
             };
 
-            interaction
+            event.interaction
                 .create_interaction_response(&data.cache_http.http, |res| {
                     res.interaction_response_data(|data| {
                         data.embed(|embed| {

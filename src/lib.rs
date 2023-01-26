@@ -7,6 +7,7 @@ mod prelude;
 
 use bot_tasks::{alert::AlertTask, announce::AnnounceTask, BotTask, menus::{sync::SyncTask, report::ReportTask}};
 use futures::future::BoxFuture;
+use poise::serenity_prelude::{MessageComponentInteraction, ShardMessenger};
 use shuttle_service::error::CustomError;
 use std::{process::Termination, sync::Arc};
 use tokio::task;
@@ -118,8 +119,14 @@ impl shuttle_service::Service for EscalatorBot {
     }
 }
 
+pub struct ComponentMessage {
+    interaction: MessageComponentInteraction,
+    shard: ShardMessenger,
+}
+
+/// TODO: rework this system and reduce cloning
 fn event_handler<'a>(
-    _serenity_ctx: &'a serenity::Context,
+    serenity_ctx: &'a serenity::Context,
     event: &'a poise::Event<'a>,
     ctx: poise::FrameworkContext<'a, Data, Error>,
     _data: &'a Data,
@@ -130,10 +137,16 @@ fn event_handler<'a>(
         interaction: Interaction::MessageComponent(interaction),
     } = event {
         if interaction.message.author.id == ctx.bot_id {
-            type ComponentMessage = Arc<serenity::MessageComponentInteraction>;
+            let create_value = || {
+                let message = ComponentMessage {
+                    interaction: interaction.clone(),
+                    shard: serenity_ctx.shard.clone(),
+                };
 
-            let create_value = || { Arc::new(interaction.clone()) };
-            ctx.user_data.send_message_with::<ComponentMessage, _>(create_value);
+                Arc::new(message)
+            };
+
+            ctx.user_data.send_message_with::<Arc<ComponentMessage>, _>(create_value);
         }
     }
 
