@@ -332,7 +332,39 @@ impl FromStr for ComponentAction {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        if let Ok(action) = s.parse::<EscalatorAction>() {
+            return Ok(Self::Escalator(action));
+        }
+
+        if s == SUBMIT_BUTTON_ID {
+            return Ok(Self::Submit);
+        }
+
+        if let Some(status) = s.strip_prefix(STATUS_BUTTON_ID_PREFIX) {
+            return Ok(Self::Status(status.parse::<Status>()?));
+        }
+
+        anyhow::bail!("Unknown ReportAction format");
+    }
+}
+
+impl FromStr for EscalatorAction {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s == PAIR_BUTTON_ID {
+            return Ok(Self::Pair);
+        }
+        
+        if s == ALL_BUTTON_ID {
+            return Ok(Self::All);
+        }
+
+        if let Some(floor) = s.strip_prefix(NUMBER_BUTTON_ID_PREFIX) {
+            return Ok(Self::Floor(floor.parse::<u8>()?));
+        }
+
+        anyhow::bail!("Unknown EscalatorAction format");
     }
 }
 
