@@ -1,5 +1,6 @@
 use crate::{
     data::{escalator_input::EscalatorInput, status::Status},
+    generate::REPORT_EMOJI,
     prelude::*,
 };
 
@@ -36,9 +37,13 @@ pub enum ComponentStatus<T> {
     Complete(T),
 }
 
-pub enum ComponentAction {}
+pub enum ComponentAction {
+    Escalator(EscalatorAction),
+    Status(Status),
+    Submit,
+}
 
-enum EscalatorAction {
+pub enum EscalatorAction {
     Pair,
     All,
     Floor(u8),
@@ -65,11 +70,88 @@ impl ReportComponent {
         // add escalator components
         components.0.append(&mut self.escalators.render().0);
 
-        todo!()
+        // selecting status
+        components
+            .create_action_row(|action_row| {
+                for status in [Status::Open, Status::Down, Status::Blocked] {
+                    let id = format!("{}{}", STATUS_BUTTON_ID_PREFIX, status.as_id_str());
+                    let mut button = ButtonState::selected_if(Some(status) == self.status)
+                        .or_else(|| ButtonState::disabled_if(self.status.is_some()))
+                        .create_button("", id);
+
+                    button.emoji(status.emoji());
+
+                    action_row.add_button(button);
+                }
+
+                action_row
+            })
+            .create_action_row(|action_row| action_row.add_button(self.create_submit_button()));
+
+        components
     }
 
     pub fn execute(&mut self, command: ComponentAction) -> ComponentStatus<Report> {
-        todo!()
+        match command {
+            ComponentAction::Escalator(command) => {
+                self.escalators.execute(command);
+                ComponentStatus::Continue
+            }
+            ComponentAction::Status(status) => {
+                match self.status {
+                    Some(old_status) if old_status == status => {
+                        self.status = None;
+                    }
+                    Some(_) => (),
+                    None => self.status = Some(status),
+                }
+
+                ComponentStatus::Continue
+            }
+            ComponentAction::Submit => match self.try_as_report() {
+                Some(report) => ComponentStatus::Complete(report),
+                None => ComponentStatus::Continue,
+            },
+        }
+    }
+
+    fn try_as_report(&self) -> Option<Report> {
+        let escalators = self.escalators.try_as_escalators()?;
+        let status = self.status?;
+
+        Some(Report { escalators, status })
+    }
+
+    fn create_submit_button(&self) -> serenity::CreateButton {
+        let Some(escalators) = self.escalators.try_as_escalators() else {
+            return Self::disabled_submit_button("Select Escalator(s)");
+        };
+
+        if self.status.is_none() {
+            return Self::disabled_submit_button("Select Status");
+        }
+
+        let label = format!("Report {}!", escalators.short_noun());
+
+        let mut button = serenity::CreateButton::default();
+        button
+            .custom_id(SUBMIT_BUTTON_ID)
+            .style(serenity::ButtonStyle::Success)
+            .emoji(REPORT_EMOJI)
+            .label(label);
+
+        button
+    }
+
+    fn disabled_submit_button(label: &str) -> serenity::CreateButton {
+        let mut button = serenity::CreateButton::default();
+        button
+            .custom_id(SUBMIT_BUTTON_ID)
+            .disabled(true)
+            .style(serenity::ButtonStyle::Danger)
+            .label(label);
+
+        button
     }
 }
 
