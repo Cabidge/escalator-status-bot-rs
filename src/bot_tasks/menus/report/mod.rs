@@ -8,6 +8,8 @@ use crate::{
     ComponentMessage,
 };
 
+use chrono::prelude::*;
+use chrono_tz::America::New_York as NYCTimeZone;
 use futures::{StreamExt, TryStreamExt};
 use poise::async_trait;
 use std::{sync::Arc, time::Duration};
@@ -62,6 +64,22 @@ impl BotTask for ReportTask {
                     continue;
                 }
             };
+
+            let nyc_now = Utc::now().with_timezone(&NYCTimeZone);
+
+            let is_weekday = nyc_now.weekday().num_days_from_monday() < 5;
+            let is_active_time = (7..=18).contains(&nyc_now.hour());
+
+            if !(is_weekday && is_active_time) {
+                let _ = event.interaction.create_interaction_response(&data.cache_http.http, |res| {
+                    res.interaction_response_data(|data| {
+                        data.content("Reports are locked any time before 6 am, after 7 pm, and during weekends.")
+                            .ephemeral(true)
+                    })
+                }).await.ok();
+
+                continue;
+            }
 
             let pool = data.pool.clone();
             let http = Arc::clone(&data.cache_http.http);
