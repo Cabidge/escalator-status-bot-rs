@@ -1,7 +1,10 @@
-use crate::{prelude::*, data::{status::Status, escalator_input::EscalatorInput}};
+use crate::{
+    data::{escalator_input::EscalatorInput, status::Status},
+    prelude::*,
+};
 
 use super::Report;
-use std::{str::FromStr, ops::BitOr};
+use std::{ops::BitOr, str::FromStr};
 
 const SELECTED_BUTTON_STYLE: serenity::ButtonStyle = serenity::ButtonStyle::Primary;
 const UNSELECTED_BUTTON_STYLE: serenity::ButtonStyle = serenity::ButtonStyle::Secondary;
@@ -72,7 +75,10 @@ impl ReportComponent {
 
 impl EscalatorComponent {
     fn new() -> Self {
-        Self::Floors { floors: None, pair: false }
+        Self::Floors {
+            floors: None,
+            pair: false,
+        }
     }
 
     fn try_as_escalators(&self) -> Option<EscalatorInput> {
@@ -125,12 +131,10 @@ impl EscalatorComponent {
                     *pair = !*pair
                 }
             }
-            EscalatorAction::All => {
-                match self {
-                    Self::Floors { .. } => *self = Self::All,
-                    Self::All => *self = Self::new(),
-                }
-            }
+            EscalatorAction::All => match self {
+                Self::Floors { .. } => *self = Self::All,
+                Self::All => *self = Self::new(),
+            },
             EscalatorAction::Floor(floor) => self.toggle_floor(floor),
         }
     }
@@ -142,8 +146,7 @@ impl EscalatorComponent {
     }
 
     fn create_all_button(&self) -> serenity::CreateButton {
-        ButtonState::selected_if(self.is_all())
-            .create_button("All", ALL_BUTTON_ID)
+        ButtonState::selected_if(self.is_all()).create_button("All", ALL_BUTTON_ID)
     }
 
     fn create_floor_button(&self, floor: u8) -> serenity::CreateButton {
@@ -263,7 +266,8 @@ impl ButtonState {
 
         let disabled = self != Self::Disabled;
 
-        button.style(style)
+        button
+            .style(style)
             .disabled(disabled)
             .custom_id(id)
             .label(label);
