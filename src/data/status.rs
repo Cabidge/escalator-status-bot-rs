@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{str::FromStr, fmt::Display, error::Error};
 
 use serde::{Deserialize, Serialize};
 
@@ -28,6 +28,7 @@ impl Status {
     }
 }
 
+#[derive(Debug)]
 pub struct UnknownStatusError(String);
 
 impl FromStr for Status {
@@ -43,3 +44,11 @@ impl FromStr for Status {
         }
     }
 }
+
+impl Display for UnknownStatusError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Unknown status: {}", self.0)
+    }
+}
+
+impl Error for UnknownStatusError {}
