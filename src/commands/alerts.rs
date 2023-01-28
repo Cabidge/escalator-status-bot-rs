@@ -4,7 +4,7 @@ use futures::{StreamExt, TryStreamExt};
 use indexmap::IndexMap;
 use itertools::Itertools;
 
-use crate::prelude::*;
+use crate::{generate, prelude::*};
 
 type Watchlist = IndexMap<EscalatorFloors, Subscription>;
 
@@ -26,6 +26,8 @@ pub async fn alerts(_ctx: Context<'_>) -> Result<(), Error> {
 /// Edit your watch list and be alerted when any escalator on it gets reported.
 #[poise::command(slash_command, ephemeral = true)]
 pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
+    const TIMEOUT: Duration = Duration::from_secs(2 * 60);
+
     ctx.defer_ephemeral().await?;
 
     let watchlist = match load_watchlist(&ctx.data().pool, ctx.author().id).await {
@@ -41,7 +43,10 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
     let mut watchlist = WatchlistComponent { watchlist };
 
     let handle = ctx
-        .send(|msg| msg.components(replace_builder_with(watchlist.render())))
+        .send(|msg| {
+            msg.content(generate::timeout_message(TIMEOUT))
+                .components(replace_builder_with(watchlist.render()))
+        })
         .await?;
 
     let mut actions = handle
@@ -51,7 +56,7 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
         .build();
 
     let res = loop {
-        let sleep = tokio::time::sleep(Duration::from_secs(2 * 60));
+        let sleep = tokio::time::sleep(TIMEOUT);
         tokio::pin!(sleep);
 
         let action = tokio::select! {
@@ -75,7 +80,8 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
 
         handle
             .edit(ctx, |msg| {
-                msg.components(replace_builder_with(watchlist.render()))
+                msg.content(generate::timeout_message(TIMEOUT))
+                    .components(replace_builder_with(watchlist.render()))
             })
             .await?;
     };
