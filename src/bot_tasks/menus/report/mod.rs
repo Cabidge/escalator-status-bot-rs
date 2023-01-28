@@ -3,7 +3,7 @@ mod component;
 use crate::{
     bot_tasks::BotTask,
     data::{escalator_input::EscalatorInput, report::UserReport, status::Status},
-    generate::REPORT_BUTTON_ID,
+    generate::{self, REPORT_BUTTON_ID},
     prelude::*,
     ComponentMessage,
 };
@@ -12,7 +12,10 @@ use chrono::prelude::*;
 use chrono_tz::America::New_York as NYCTimeZone;
 use futures::{StreamExt, TryStreamExt};
 use poise::async_trait;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 use tokio::sync::broadcast::{self, error::RecvError};
 
 pub struct ReportTask;
@@ -100,13 +103,25 @@ async fn handle_report(
     event: &ComponentMessage,
     reporter: broadcast::Sender<UserReport>,
 ) -> Result<(), Error> {
+    const TIMEOUT: Duration = Duration::from_secs(2 * 60);
+
+    fn timeout_timestamp() -> String {
+        let timestamp = generate::Timestamp::Relative
+            .generate_at(SystemTime::now() + TIMEOUT)
+            .expect("Time went backwards");
+
+        format!("This menu will timeout {timestamp}")
+    }
+
     let mut report = component::ReportComponent::new();
 
     event
         .interaction
         .create_interaction_response(&http, |res| {
             res.interaction_response_data(|data| {
-                data.set_components(report.render()).ephemeral(true)
+                data.content(timeout_timestamp())
+                    .set_components(report.render())
+                    .ephemeral(true)
             })
         })
         .await?;
@@ -119,7 +134,7 @@ async fn handle_report(
         .build();
 
     let res = loop {
-        let sleep = tokio::time::sleep(Duration::from_secs(2 * 60));
+        let sleep = tokio::time::sleep(TIMEOUT);
         tokio::pin!(sleep);
 
         let action = tokio::select! {
@@ -145,7 +160,10 @@ async fn handle_report(
 
         event
             .interaction
-            .edit_original_interaction_response(http, |res| res.components(replace_components))
+            .edit_original_interaction_response(http, |res| {
+                res.content(timeout_timestamp())
+                    .components(replace_components)
+            })
             .await?;
     };
 

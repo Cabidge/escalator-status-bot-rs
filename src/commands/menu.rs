@@ -1,7 +1,4 @@
-use crate::{
-    generate,
-    prelude::*,
-};
+use crate::{generate, prelude::*};
 
 use poise::serenity_prelude::CacheHttp;
 

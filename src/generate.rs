@@ -1,3 +1,5 @@
+use std::time::{SystemTime, SystemTimeError};
+
 use crate::{
     data::{report::UserReport, status::Status},
     prelude::*,
@@ -210,4 +212,47 @@ pub fn menu_buttons() -> serenity::CreateComponents {
     });
 
     components
+}
+
+/// Explanation: https://gist.github.com/LeviSnoot/d9147767abeef2f770e9ddcd91eb85aa
+pub enum Timestamp {
+    Default,
+    ShortTime,
+    LongTime,
+    ShortDate,
+    LongDate,
+    Short,
+    Long,
+    Relative,
+}
+
+impl Timestamp {
+    pub fn as_style(&self) -> Option<&'static str> {
+        match self {
+            Self::Default => None,
+            Self::ShortTime => Some("t"),
+            Self::LongTime => Some("T"),
+            Self::ShortDate => Some("d"),
+            Self::LongDate => Some("D"),
+            Self::Short => Some("f"),
+            Self::Long => Some("F"),
+            Self::Relative => Some("R"),
+        }
+    }
+
+    /// Generate a Discord timestamp at the given time (ie. <t:[unix_timestamp]:[style]>).
+    pub fn generate_at(&self, time: SystemTime) -> Result<String, SystemTimeError> {
+        let unix = time.duration_since(SystemTime::UNIX_EPOCH)?.as_secs();
+
+        let mut timestamp = format!("<t:{unix}");
+
+        if let Some(style) = self.as_style() {
+            timestamp.push(':');
+            timestamp.push_str(style);
+        }
+
+        timestamp.push('>');
+
+        Ok(timestamp)
+    }
 }

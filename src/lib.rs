@@ -1,8 +1,8 @@
 pub mod data;
+pub mod generate;
 
 mod bot_tasks;
 mod commands;
-mod generate;
 mod migration;
 mod prelude;
 

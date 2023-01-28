@@ -355,7 +355,7 @@ impl FromStr for EscalatorAction {
         if s == PAIR_BUTTON_ID {
             return Ok(Self::Pair);
         }
-        
+
         if s == ALL_BUTTON_ID {
             return Ok(Self::All);
         }
