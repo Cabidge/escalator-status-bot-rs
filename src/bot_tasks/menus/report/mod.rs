@@ -154,7 +154,8 @@ async fn handle_report(
     event
         .interaction
         .edit_original_interaction_response(http, |msg| {
-            msg.components(|components| components.set_action_rows(vec![]))
+            msg.content("Processing...")
+                .components(|components| components.set_action_rows(vec![]))
         })
         .await?;
 

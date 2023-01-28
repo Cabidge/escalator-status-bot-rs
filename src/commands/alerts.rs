@@ -85,7 +85,8 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
     // clear the components
     handle
         .edit(ctx, |msg| {
-            msg.components(|components| components.set_action_rows(vec![]))
+            msg.content("Processing...")
+                .components(|components| components.set_action_rows(vec![]))
         })
         .await?;
 
