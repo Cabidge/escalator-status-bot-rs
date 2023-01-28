@@ -5,15 +5,14 @@ use std::{
 
 use tokio::sync::broadcast;
 
+#[derive(Default)]
 pub struct AnyChannels {
     channels: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
 impl AnyChannels {
     pub fn new() -> Self {
-        AnyChannels {
-            channels: HashMap::new(),
-        }
+        Self::default()
     }
 
     /// Tries to send out a given value,
