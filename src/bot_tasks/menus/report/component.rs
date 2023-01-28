@@ -378,7 +378,7 @@ impl ButtonState {
             UNSELECTED_BUTTON_STYLE
         };
 
-        let disabled = self != Self::Disabled;
+        let disabled = self == Self::Disabled;
 
         button
             .style(style)
