@@ -5,11 +5,10 @@ use super::BotTask;
 use futures::future::join_all;
 use poise::async_trait;
 use std::{sync::Arc, time::Duration};
-use tokio::{sync::broadcast, time::Instant};
+use tokio::sync::broadcast;
 
 pub struct AnnounceTask {
-    min_interval: Duration,
-    max_interval: Duration,
+    delay: Duration,
     max_reports_displayed: usize,
 }
 
@@ -22,8 +21,7 @@ pub struct TaskData {
 impl Default for AnnounceTask {
     fn default() -> Self {
         Self {
-            min_interval: Duration::from_secs(60),
-            max_interval: Duration::from_secs(5 * 60),
+            delay: Duration::from_secs(2 * 60),
             max_reports_displayed: 8,
         }
     }
@@ -53,11 +51,7 @@ impl BotTask for AnnounceTask {
 
     async fn run(self, mut data: Self::Data) -> Self::Term {
         loop {
-            let last_announcement = Instant::now();
-
-            let reports = self
-                .accumulate_reports(last_announcement, &mut data.reports)
-                .await?;
+            let reports = self.accumulate_reports(&mut data.reports).await?;
 
             log::info!("Grabbing announcement channels...");
 
@@ -125,7 +119,6 @@ impl BotTask for AnnounceTask {
 impl AnnounceTask {
     async fn accumulate_reports(
         &self,
-        last_announcement: Instant,
         reports: &mut broadcast::Receiver<UserReport>,
     ) -> anyhow::Result<Vec<UserReport>> {
         let mut accumulated = loop {
@@ -144,23 +137,12 @@ impl AnnounceTask {
             };
         };
 
-        let now = Instant::now();
-
-        let time_since_last = now.duration_since(last_announcement);
-
-        // TODO: figure this out
-        let delay = if self.min_interval + time_since_last < self.max_interval {
-            self.max_interval - time_since_last
-        } else {
-            self.min_interval
-        };
-
         log::info!(
             "Received update, pooling for {} seconds before announcing.",
-            delay.as_secs()
+            self.delay.as_secs()
         );
 
-        let sleep = tokio::time::sleep(delay);
+        let sleep = tokio::time::sleep(self.delay);
         tokio::pin!(sleep);
 
         // continue to save the updates until the interval is up
