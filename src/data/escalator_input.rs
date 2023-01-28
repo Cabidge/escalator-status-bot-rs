@@ -12,7 +12,7 @@ pub enum InputError {
     InvalidEscalator(u8, u8),
 }
 
-fn parse_floor(ch: char) -> Result<u8, InputError> {
+pub fn parse_floor(ch: char) -> Result<u8, InputError> {
     match ch {
         '1'..='9' => Ok(ch as u8 - b'0'),
         floor => Err(InputError::InvalidFloor(floor)),
