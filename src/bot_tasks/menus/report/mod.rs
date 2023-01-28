@@ -193,7 +193,7 @@ async fn handle_report(
     };
 
     let message = format!(
-        "{} Successfully reported {}.",
+        "`{}` Successfully reported {}.",
         report.status.emoji(),
         report.escalators.message_noun(),
     );
