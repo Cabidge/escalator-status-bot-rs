@@ -5,7 +5,7 @@ use super::{escalator_input::EscalatorInput, status::Status};
 use smallvec::SmallVec;
 use std::fmt::Display;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct UserReport {
     pub reporter: Option<serenity::UserId>,
     pub escalators: EscalatorInput,
