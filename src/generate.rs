@@ -227,16 +227,16 @@ pub enum Timestamp {
 }
 
 impl Timestamp {
-    pub fn as_style(&self) -> Option<&'static str> {
+    pub fn as_style(&self) -> Option<char> {
         match self {
             Self::Default => None,
-            Self::ShortTime => Some("t"),
-            Self::LongTime => Some("T"),
-            Self::ShortDate => Some("d"),
-            Self::LongDate => Some("D"),
-            Self::Short => Some("f"),
-            Self::Long => Some("F"),
-            Self::Relative => Some("R"),
+            Self::ShortTime => Some('t'),
+            Self::LongTime => Some('T'),
+            Self::ShortDate => Some('d'),
+            Self::LongDate => Some('D'),
+            Self::Short => Some('f'),
+            Self::Long => Some('F'),
+            Self::Relative => Some('R'),
         }
     }
 
@@ -248,7 +248,7 @@ impl Timestamp {
 
         if let Some(style) = self.as_style() {
             timestamp.push(':');
-            timestamp.push_str(style);
+            timestamp.push(style);
         }
 
         timestamp.push('>');
