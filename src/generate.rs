@@ -12,7 +12,7 @@ pub async fn gist(pool: &sqlx::PgPool) -> Result<serenity::CreateEmbed, sqlx::Er
 
     embed.title("Here's the gist...");
 
-    let escalator_count = sqlx::query_as::<_, (i32,)>("SELECT COUNT(*) FROM escalators")
+    let escalator_count = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM escalators")
         .fetch_one(pool)
         .await?
         .0 as usize;
