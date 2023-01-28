@@ -1,4 +1,4 @@
-use std::time::{SystemTime, SystemTimeError};
+use std::time::{Duration, SystemTime, SystemTimeError};
 
 use crate::{
     data::{report::UserReport, status::Status},
@@ -255,4 +255,12 @@ impl Timestamp {
 
         Ok(timestamp)
     }
+}
+
+pub fn timeout_message(duration: Duration) -> String {
+    let timestamp = Timestamp::Relative
+        .generate_at(SystemTime::now() + duration)
+        .expect("Time went backwards");
+
+    format!("This menu will timeout {timestamp}")
 }

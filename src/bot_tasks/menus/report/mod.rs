@@ -12,10 +12,7 @@ use chrono::prelude::*;
 use chrono_tz::America::New_York as NYCTimeZone;
 use futures::{StreamExt, TryStreamExt};
 use poise::async_trait;
-use std::{
-    sync::Arc,
-    time::{Duration, SystemTime},
-};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::broadcast::{self, error::RecvError};
 
 pub struct ReportTask;
@@ -105,21 +102,13 @@ async fn handle_report(
 ) -> Result<(), Error> {
     const TIMEOUT: Duration = Duration::from_secs(2 * 60);
 
-    fn timeout_timestamp() -> String {
-        let timestamp = generate::Timestamp::Relative
-            .generate_at(SystemTime::now() + TIMEOUT)
-            .expect("Time went backwards");
-
-        format!("This menu will timeout {timestamp}")
-    }
-
     let mut report = component::ReportComponent::new();
 
     event
         .interaction
         .create_interaction_response(&http, |res| {
             res.interaction_response_data(|data| {
-                data.content(timeout_timestamp())
+                data.content(generate::timeout_message(TIMEOUT))
                     .set_components(report.render())
                     .ephemeral(true)
             })
@@ -161,7 +150,7 @@ async fn handle_report(
         event
             .interaction
             .edit_original_interaction_response(http, |res| {
-                res.content(timeout_timestamp())
+                res.content(generate::timeout_message(TIMEOUT))
                     .components(replace_components)
             })
             .await?;
