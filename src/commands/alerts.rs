@@ -12,7 +12,7 @@ struct WatchlistComponent {
     watchlist: Watchlist,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 enum Subscription {
     Watch,
     Ignore,
@@ -231,7 +231,7 @@ async fn update_watchlist(
         )
         ",
     )
-    .bind(user_id.0 as i16)
+    .bind(user_id.0 as i64)
     .bind(&starts)
     .bind(&ends)
     .execute(&mut transaction)
@@ -250,7 +250,7 @@ async fn update_watchlist(
         WHERE a.user_id IS NULL
         ",
     )
-    .bind(user_id.0 as i16)
+    .bind(user_id.0 as i64)
     .bind(&starts)
     .bind(&ends)
     .execute(&mut transaction)
