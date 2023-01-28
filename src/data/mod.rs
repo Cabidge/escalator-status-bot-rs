@@ -1,89 +1,49 @@
-pub mod alerts;
+pub mod channels;
+pub mod escalator;
 pub mod escalator_input;
-pub mod escalators;
-pub mod history_channel;
-pub mod report_menu;
+pub mod report;
 pub mod status;
-
-pub use escalators::*;
-pub use history_channel::HistoryChannel;
-pub use report_menu::ReportMenu;
 
 use crate::prelude::*;
 
-use shuttle_persist::PersistInstance;
-use std::{fmt::Display, sync::Arc};
-use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
+use std::sync::Arc;
+use tokio::sync::{broadcast, Mutex};
 
-use self::{alerts::Alerts, escalator_input::EscalatorInput, status::Status};
-
-#[derive(Debug)]
 pub struct Data {
     pub shard_manager: Arc<Mutex<serenity::ShardManager>>,
-    pub statuses: Arc<Mutex<Statuses>>,
-    pub report_menu: Arc<Mutex<ReportMenu>>,
-    pub history_channel: Arc<RwLock<HistoryChannel>>,
-    pub alerts: Arc<Mutex<Alerts>>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct UserReport {
-    pub escalators: EscalatorInput,
-    pub status: Status,
-    pub reporter: Option<serenity::UserId>,
+    pub pool: sqlx::PgPool,
+    channels: parking_lot::RwLock<channels::AnyChannels>,
 }
 
 impl Data {
-    pub async fn load_persist(
-        persist: &PersistInstance,
-        shard_manager: Arc<Mutex<serenity::ShardManager>>,
-        ctx: &serenity::Context,
-        user_reports_tx: mpsc::Sender<UserReport>,
-        updates_tx: broadcast::Sender<Update>,
-    ) -> Self {
-        log::info!("Loading data...");
-
-        let statuses = Statuses::load_persist(persist, updates_tx);
-        let statuses = Arc::new(Mutex::new(statuses));
-
-        let report_menu = ReportMenu::load_persist(persist, user_reports_tx, ctx).await;
-        let report_menu = Arc::new(Mutex::new(report_menu));
-
-        let history_channel = HistoryChannel::load_persist(persist);
-        let history_channel = Arc::new(RwLock::new(history_channel));
-
-        let alerts = Alerts::load_persist(persist, &ctx).await;
-        let alerts = Arc::new(Mutex::new(alerts));
-
-        Data {
+    pub fn new(shard_manager: Arc<Mutex<serenity::ShardManager>>, pool: sqlx::PgPool) -> Self {
+        Self {
             shard_manager,
-            statuses,
-            report_menu,
-            history_channel,
-            alerts,
+            pool,
+            channels: parking_lot::RwLock::new(channels::AnyChannels::new()),
         }
     }
 
-    pub async fn save_persist(&self, persist: &PersistInstance) {
-        self.statuses.lock().await.save_persist(persist);
-        self.report_menu.lock().await.save_persist(persist);
-        self.history_channel.write().await.save_persist(persist);
-        self.alerts.lock().await.save_persist(persist);
+    /// Attempts to send a value, not creating a Sender if no Receivers exist.
+    pub fn send_message<T: 'static + Clone + Send + Sync>(&self, value: T) {
+        let _ = self.channels.read().try_send(value).ok();
     }
-}
 
-impl Display for UserReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let emoji = self.status.emoji();
-        let reporter = self
-            .reporter
-            .map(|id| format!("<@{}>", id))
-            .unwrap_or_else(|| String::from("an unknown user"));
+    pub fn send_message_with<T: 'static + Clone + Send + Sync, F>(&self, f: F)
+    where
+        F: FnOnce() -> T,
+    {
+        if let Some(sender) = self.channels.read().try_sender() {
+            let value = f();
+            let _ = sender.send(value).ok();
+        }
+    }
 
-        write!(
-            f,
-            "`{emoji}` {reporter} reported {}.",
-            self.escalators.message_noun()
-        )
+    pub fn sender<T: 'static + Clone + Send + Sync>(&self) -> broadcast::Sender<T> {
+        self.channels.write().sender()
+    }
+
+    pub fn receiver<T: 'static + Clone + Send + Sync>(&self) -> broadcast::Receiver<T> {
+        self.channels.write().receiver()
     }
 }

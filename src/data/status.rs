@@ -1,8 +1,9 @@
-use std::str::FromStr;
+use std::{error::Error, fmt::Display, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(sqlx::Type, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[sqlx(type_name = "escalator_status", rename_all = "lowercase")]
 pub enum Status {
     Open,
     Down,
@@ -27,6 +28,7 @@ impl Status {
     }
 }
 
+#[derive(Debug)]
 pub struct UnknownStatusError(String);
 
 impl FromStr for Status {
@@ -42,3 +44,11 @@ impl FromStr for Status {
         }
     }
 }
+
+impl Display for UnknownStatusError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Unknown status: {}", self.0)
+    }
+}
+
+impl Error for UnknownStatusError {}

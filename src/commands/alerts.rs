@@ -1,40 +1,52 @@
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
-use anyhow::anyhow;
+use futures::{StreamExt, TryStreamExt};
+use indexmap::IndexMap;
 use itertools::Itertools;
-use poise::futures_util::StreamExt;
 
-use crate::{
-    data::{ESCALATORS, ESCALATOR_COUNT, PAIR_ORDER},
-    prelude::*,
-};
+use crate::{generate, prelude::*};
+
+type Watchlist = IndexMap<EscalatorFloors, Subscription>;
+
+struct WatchlistComponent {
+    watchlist: Watchlist,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Subscription {
+    Watch,
+    Ignore,
+}
 
 #[poise::command(slash_command, subcommands("edit", "list"))]
 pub async fn alerts(_ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-struct WatchListComponent {
-    watch_list: [bool; ESCALATOR_COUNT],
-}
-
 /// Edit your watch list and be alerted when any escalator on it gets reported.
 #[poise::command(slash_command, ephemeral = true)]
 pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
+    const TIMEOUT: Duration = Duration::from_secs(2 * 60);
+
     ctx.defer_ephemeral().await?;
 
-    let watch_list = ctx
-        .data()
-        .alerts
-        .lock()
-        .await
-        .get_watch_list(ctx.author())
-        .unwrap_or_default(); // jesus why is this so long
+    let watchlist = match load_watchlist(&ctx.data().pool, ctx.author().id).await {
+        Ok(watchlist) => watchlist,
+        Err(err) => {
+            log::error!("An error ocurred trying to load watchlist: {err}");
+            ctx.say("A database error ocurred.").await?;
 
-    let mut components = WatchListComponent { watch_list };
+            return Ok(());
+        }
+    };
+
+    let mut watchlist = WatchlistComponent { watchlist };
 
     let handle = ctx
-        .send(|msg| msg.components(replace_builder_with(components.render())))
+        .send(|msg| {
+            msg.content(generate::timeout_message(TIMEOUT))
+                .components(replace_builder_with(watchlist.render()))
+        })
         .await?;
 
     let mut actions = handle
@@ -44,50 +56,65 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
         .build();
 
     let res = loop {
-        let sleep = tokio::time::sleep(Duration::from_secs(2 * 60));
+        let sleep = tokio::time::sleep(TIMEOUT);
         tokio::pin!(sleep);
 
         let action = tokio::select! {
             Some(action) = actions.next() => action,
-            _ = sleep => break Err(anyhow!("Timeout")),
+            _ = sleep => break None,
         };
 
         action.defer(ctx).await?;
 
-        if let Some(list) = components.try_action(&action.data.custom_id) {
-            break Ok(list);
+        let command = match action.data.custom_id.parse::<ComponentAction>() {
+            Ok(command) => command,
+            Err(err) => {
+                log::warn!("An error ocurred parsing a component command: {err}");
+                continue;
+            }
+        };
+
+        if let ComponentStatus::Complete(watchlist) = watchlist.execute(command) {
+            break Some(watchlist);
         }
 
         handle
             .edit(ctx, |msg| {
-                msg.components(replace_builder_with(components.render()))
+                msg.content(generate::timeout_message(TIMEOUT))
+                    .components(replace_builder_with(watchlist.render()))
             })
             .await?;
     };
 
     actions.stop();
 
-    let Ok(watch_list) = res else {
+    // clear the components
+    handle
+        .edit(ctx, |msg| {
+            msg.content("Processing...")
+                .components(|components| components.set_action_rows(vec![]))
+        })
+        .await?;
+
+    let Some(watchlist) = res else {
         handle.edit(ctx, |msg| {
             msg.content("Interaction timed out, try again...")
-                .components(|components| {
-                    components.set_action_rows(vec![])
-                })
         }).await?;
+
         return Ok(());
     };
 
-    ctx.data()
-        .alerts
-        .lock()
-        .await
-        .replace(ctx.author(), watch_list);
+    if let Err(err) = update_watchlist(&ctx.data().pool, ctx.author().id, watchlist).await {
+        log::error!("An error ocurred trying to update watchlist: {err}");
+        handle
+            .edit(ctx, |msg| msg.content("A database error ocurred."))
+            .await?;
+
+        return Ok(());
+    }
 
     handle
-        .edit(ctx, |msg| {
-            msg.content("Watch list updated.")
-                .components(|components| components.set_action_rows(vec![]))
-        })
+        .edit(ctx, |msg| msg.content("Watchlist updated."))
         .await?;
 
     Ok(())
@@ -98,66 +125,180 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
 pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;
 
-    let alerts = ctx.data().alerts.lock().await;
+    let res = sqlx::query_as::<_, Escalator>(
+        "
+        SELECT e.floor_start, e.floor_end, e.current_status
+        FROM alerts a
+        INNER JOIN escalators e
+            ON a.floor_start = e.floor_start
+            AND a.floor_end = e.floor_end
+        WHERE a.user_id = $1
+        ORDER BY a.floor_start, a.floor_end
+        ",
+    )
+    .bind(ctx.author().id.0 as i64)
+    .fetch_all(&ctx.data().pool)
+    .await;
 
-    let Some(watch_list) = alerts.get_watch_list(ctx.author()) else {
-        ctx.say("Your watch list is empty. Try adding escalators to it with the `/alerts edit` command.").await?;
-        return Ok(());
+    let msg = match res {
+        Ok(watchlist) => {
+            let body = watchlist.iter().map(Escalator::to_string).join("\n");
+
+            format!("**Your Watch List:**```\n{body}```")
+        }
+        Err(err) => {
+            log::error!("An error ocurred generating the watchlist status: {err}");
+            String::from("A database error ocurred.")
+        }
     };
 
-    let statuses = ctx.data().statuses.lock().await;
-    let message = String::from("**Your Watch List:**```\n")
-        + &watch_list
-            .into_iter()
-            .enumerate()
-            .filter_map(|(index, selected)| {
-                if !selected {
-                    return None;
-                };
-                let escalator = ESCALATORS[index];
-                let emoji = statuses.get_info(escalator)?.status_emoji();
-                Some(format_escalator(emoji, escalator))
-            })
-            .join("\n")
-        + "```";
-
-    ctx.say(message).await?;
+    ctx.say(msg).await?;
 
     Ok(())
+}
+
+async fn load_watchlist(
+    pool: &sqlx::PgPool,
+    user_id: serenity::UserId,
+) -> Result<Watchlist, sqlx::Error> {
+    use sqlx::Row;
+
+    #[derive(sqlx::FromRow)]
+    struct WatchlistEntry {
+        #[sqlx(flatten)]
+        floors: EscalatorFloors,
+        #[sqlx(flatten)]
+        subscription: Subscription,
+    }
+
+    impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for Subscription {
+        fn from_row(row: &'r sqlx::postgres::PgRow) -> Result<Self, sqlx::Error> {
+            let sub = if row.try_get("watching")? {
+                Subscription::Watch
+            } else {
+                Subscription::Ignore
+            };
+
+            Ok(sub)
+        }
+    }
+
+    let mut watchlist = IndexMap::new();
+
+    let mut entries = sqlx::query_as::<_, WatchlistEntry>(
+        "
+        SELECT e.floor_start, e.floor_end, (a.user_id IS NOT NULL) as watching
+        FROM escalators e
+        LEFT OUTER JOIN alerts a
+            ON e.floor_start = a.floor_start
+            AND e.floor_end = a.floor_end
+            AND a.user_id = $1
+        ORDER BY e.floor_start + e.floor_end, e.floor_start
+        ",
+    )
+    .bind(user_id.0 as i64)
+    .fetch(pool);
+
+    while let Some(entry) = entries.try_next().await? {
+        watchlist.insert(entry.floors, entry.subscription);
+    }
+
+    Ok(watchlist)
+}
+
+async fn update_watchlist(
+    pool: &sqlx::PgPool,
+    user_id: serenity::UserId,
+    watchlist: &Watchlist,
+) -> Result<(), sqlx::Error> {
+    let mut transaction = pool.begin().await?;
+
+    let mut starts = vec![];
+    let mut ends = vec![];
+
+    let watching = watchlist
+        .iter()
+        .filter_map(|(floors, sub)| (sub.is_watching()).then_some(*floors));
+
+    for EscalatorFloors { start, end } in watching {
+        starts.push(start as i16);
+        ends.push(end as i16);
+    }
+
+    sqlx::query(
+        "
+        DELETE FROM alerts a
+        WHERE user_id = $1
+        AND NOT EXISTS (
+            SELECT FROM UNNEST($2::smallint[], $3::smallint[])
+                AS w (floor_start, floor_end)
+            WHERE a.floor_start = w.floor_start
+            AND a.floor_end = w.floor_end
+        )
+        ",
+    )
+    .bind(user_id.0 as i64)
+    .bind(&starts)
+    .bind(&ends)
+    .execute(&mut transaction)
+    .await?;
+
+    sqlx::query(
+        "
+        INSERT INTO alerts (user_id, floor_start, floor_end)
+        SELECT $1 as user_id, w.floor_start, w.floor_end
+        FROM UNNEST($2::smallint[], $3::smallint[])
+            AS w (floor_start, floor_end)
+        LEFT OUTER JOIN alerts a
+            ON $1 = a.user_id
+            AND w.floor_start = a.floor_start
+            AND w.floor_end = a.floor_end
+        WHERE a.user_id IS NULL
+        ",
+    )
+    .bind(user_id.0 as i64)
+    .bind(&starts)
+    .bind(&ends)
+    .execute(&mut transaction)
+    .await?;
+
+    transaction.commit().await
 }
 
 const ESCALATOR_BUTTON_ID_PREFIX: &str = "ALERTS-ESCALATOR-";
 const SUBMIT_BUTTON_ID: &str = "ALERTS-SUBMIT";
 const SUBMIT_BUTTON_EMOJI: char = '💾';
 
-impl WatchListComponent {
-    fn try_action(&mut self, action_id: &str) -> Option<[bool; ESCALATOR_COUNT]> {
-        if let Some(index) = action_id.strip_prefix(ESCALATOR_BUTTON_ID_PREFIX) {
-            self.toggle_index(index.parse().ok()?);
-            return None;
-        }
+enum ComponentStatus<T> {
+    Continue,
+    Complete(T),
+}
 
-        if action_id == SUBMIT_BUTTON_ID {
-            return Some(self.watch_list);
-        }
+enum ComponentAction {
+    Toggle(EscalatorFloors),
+    Submit,
+}
 
-        None
-    }
-
-    fn toggle_index(&mut self, index: usize) {
-        if index < ESCALATOR_COUNT {
-            self.watch_list[index] = !self.watch_list[index];
-        }
-    }
-
+impl WatchlistComponent {
     fn render(&self) -> serenity::CreateComponents {
-        let mut action_rows = PAIR_ORDER
+        let mut action_rows = self
+            .watchlist
+            .iter()
             .chunks(4)
+            .into_iter()
             .map(|row| {
                 let mut action_row = serenity::CreateActionRow::default();
 
-                for &index in row {
-                    action_row.create_button(|button| self.escalator_button(button, index));
+                for (&floors, &sub) in row {
+                    let id = format!("{ESCALATOR_BUTTON_ID_PREFIX}{floors}");
+
+                    let style = match sub {
+                        Subscription::Watch => serenity::ButtonStyle::Primary,
+                        Subscription::Ignore => serenity::ButtonStyle::Secondary,
+                    };
+
+                    action_row
+                        .create_button(|button| button.label(floors).custom_id(id).style(style));
                 }
 
                 action_row
@@ -179,26 +320,55 @@ impl WatchListComponent {
         components
     }
 
-    fn escalator_button<'a>(
-        &self,
-        button: &'a mut serenity::CreateButton,
-        index: usize,
-    ) -> &'a mut serenity::CreateButton {
-        let (start, end) = ESCALATORS[index];
-        let label = format!("{}-{}", start, end);
+    fn execute(&mut self, command: ComponentAction) -> ComponentStatus<&Watchlist> {
+        match command {
+            ComponentAction::Submit => ComponentStatus::Complete(&self.watchlist),
+            ComponentAction::Toggle(floors) => {
+                if let Some(sub) = self.watchlist.get_mut(&floors) {
+                    sub.toggle();
+                }
 
-        let id = format!("{}{}", ESCALATOR_BUTTON_ID_PREFIX, index);
-
-        let style = if self.watch_list[index] {
-            serenity::ButtonStyle::Primary
-        } else {
-            serenity::ButtonStyle::Secondary
-        };
-
-        button.label(label).custom_id(id).style(style)
+                ComponentStatus::Continue
+            }
+        }
     }
 }
 
-fn format_escalator(emoji: char, (start, end): Escalator) -> String {
-    format!("{} {}-{}", emoji, start, end)
+impl Subscription {
+    fn toggle(&mut self) {
+        match self {
+            Self::Watch => *self = Self::Ignore,
+            Self::Ignore => *self = Self::Watch,
+        }
+    }
+
+    fn is_watching(&self) -> bool {
+        match self {
+            Self::Watch => true,
+            Self::Ignore => false,
+        }
+    }
+}
+
+impl FromStr for ComponentAction {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some(floors) = s.strip_prefix(ESCALATOR_BUTTON_ID_PREFIX) {
+            let (start, end) = floors
+                .split_once('-')
+                .ok_or_else(|| anyhow::anyhow!("Invalid escalator"))?;
+
+            let start = start.parse::<u8>()?;
+            let end = end.parse::<u8>()?;
+
+            return Ok(ComponentAction::Toggle(EscalatorFloors { start, end }));
+        }
+
+        if s == SUBMIT_BUTTON_ID {
+            return Ok(ComponentAction::Submit);
+        }
+
+        anyhow::bail!("Unknown command");
+    }
 }

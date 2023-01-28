@@ -2,7 +2,7 @@ mod alerts;
 mod history;
 mod menu;
 
-use crate::prelude::*;
+use crate::{generate, prelude::*};
 
 /// Returns a vector containing all enabled bot commands.
 pub fn commands() -> Vec<poise::Command<crate::Data, Error>> {
@@ -35,9 +35,16 @@ async fn kill(ctx: Context<'_>) -> Result<(), Error> {
 async fn gist(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;
 
-    let gist = ctx.data().statuses.lock().await.gist();
-    ctx.send(move |msg| msg.embed(replace_builder_with(gist)))
-        .await?;
+    match generate::gist(&ctx.data().pool).await {
+        Ok(gist) => {
+            ctx.send(move |msg| msg.embed(replace_builder_with(gist)))
+                .await?;
+        }
+        Err(err) => {
+            log::error!("An error ocurred trying to generate a gist: {err}");
+            ctx.say("A database error ocurred.").await?;
+        }
+    }
 
     Ok(())
 }

@@ -1,22 +1,17 @@
-mod alert;
-mod announcements;
-mod autosave;
-mod forward_reports;
-mod handle_outdated;
-mod sync_menu;
-
-pub use alert::AlertTask;
-pub use announcements::AnnouncementTask;
-pub use autosave::AutoSaveTask;
-pub use forward_reports::ForwardReportTask;
-pub use handle_outdated::HandleOutdatedTask;
-pub use sync_menu::SyncMenuTask;
+pub mod alert;
+pub mod announce;
+pub mod menus;
 
 use crate::prelude::*;
 
-use std::sync::Arc;
-use tokio::task::JoinHandle;
+use poise::async_trait;
+use std::{process::Termination, sync::Weak};
 
-pub trait BotTask {
-    fn begin(self, framework: Arc<poise::Framework<Data, Error>>) -> JoinHandle<()>;
+#[async_trait]
+pub trait BotTask: Send + Sync {
+    type Data: Send;
+    type Term: Termination;
+
+    async fn setup(&self, framework: Weak<poise::Framework<Data, Error>>) -> Option<Self::Data>;
+    async fn run(self, data: Self::Data) -> Self::Term;
 }

@@ -1,14 +1,22 @@
+pub mod data;
+pub mod generate;
+
 mod bot_tasks;
 mod commands;
-mod data;
+mod migration;
 mod prelude;
 
-use bot_tasks::*;
-use std::sync::Arc;
-use tokio::{
-    sync::{broadcast, mpsc},
-    task,
+use bot_tasks::{
+    alert::AlertTask,
+    announce::AnnounceTask,
+    menus::{info::InfoTask, report::ReportTask, sync::SyncTask},
+    BotTask,
 };
+use futures::future::BoxFuture;
+use poise::serenity_prelude::{MessageComponentInteraction, ShardMessenger};
+use shuttle_service::error::CustomError;
+use std::{process::Termination, sync::Arc};
+use tokio::task;
 
 use prelude::*;
 
@@ -21,40 +29,38 @@ struct EscalatorBot {
 async fn init(
     #[shuttle_secrets::Secrets] secret_store: shuttle_secrets::SecretStore,
     #[shuttle_persist::Persist] persist: shuttle_persist::PersistInstance,
+    #[shuttle_shared_db::Postgres] pool: sqlx::PgPool,
 ) -> Result<EscalatorBot, shuttle_service::Error> {
     // try to get token, errors if token isn't found
     let Some(token) = secret_store.get("TOKEN") else {
         return Err(anyhow::anyhow!("Discord token not found...").into());
     };
 
-    let persist = Arc::new(persist);
-
-    let (updates_tx, updates_rx) = broadcast::channel(32);
-    let (user_reports_tx, user_reports_rx) = mpsc::channel(2);
-
-    let cloned_persist = Arc::clone(&persist);
+    sqlx::migrate!()
+        .run(&pool)
+        .await
+        .map_err(CustomError::new)?;
 
     // create bot framework
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             // add bot commands
             commands: commands::commands(),
+            event_handler,
             ..Default::default()
         })
         .token(token)
         .intents(serenity::GatewayIntents::non_privileged())
         .setup(move |ctx, _ready, framework| {
-            // set up bot data
-            let persist = cloned_persist;
-            log::info!("Bot is ready");
-
-            let shard_manager = Arc::clone(framework.shard_manager());
-
             Box::pin(async move {
-                let data =
-                    Data::load_persist(&persist, shard_manager, ctx, user_reports_tx, updates_tx)
-                        .await;
-                Ok(data)
+                // set up bot data
+                log::info!("Bot is ready");
+
+                let shard_manager = Arc::clone(framework.shard_manager());
+
+                migration::migrate_to_sqlx(&persist, &pool, ctx).await;
+
+                Ok(Data::new(shard_manager, pool))
             })
         })
         .build()
@@ -62,12 +68,11 @@ async fn init(
         .map_err(anyhow::Error::new)?;
 
     let bot = EscalatorBot::new(framework)
-        .add_task(AlertTask(updates_rx.resubscribe()))
-        .add_task(AnnouncementTask(updates_rx.resubscribe()))
-        .add_task(AutoSaveTask(persist))
-        .add_task(ForwardReportTask(user_reports_rx))
-        .add_task(HandleOutdatedTask)
-        .add_task(SyncMenuTask(updates_rx));
+        .add_task(AnnounceTask::default())
+        .add_task(AlertTask)
+        .add_task(InfoTask)
+        .add_task(ReportTask)
+        .add_task(SyncTask);
 
     Ok(bot)
 }
@@ -80,8 +85,26 @@ impl EscalatorBot {
         }
     }
 
-    fn add_task<T: BotTask>(mut self, task: T) -> Self {
-        self.tasks.push(task.begin(Arc::clone(&self.framework)));
+    fn add_task<T: BotTask + 'static>(mut self, task: T) -> Self {
+        let framework = Arc::downgrade(&self.framework);
+        let handle = tokio::spawn(async move {
+            if let Some(data) = task.setup(framework).await {
+                let code = task.run(data).await.report();
+                log::debug!(
+                    "Task {} failed with exit code: {:?}",
+                    std::any::type_name::<T>(),
+                    code
+                )
+            } else {
+                log::error!(
+                    "Faield to run setup for bot task: {}",
+                    std::any::type_name::<T>()
+                );
+            }
+        });
+
+        self.tasks.push(handle);
+
         self
     }
 }
@@ -101,4 +124,40 @@ impl shuttle_service::Service for EscalatorBot {
 
         Ok(())
     }
+}
+
+pub struct ComponentMessage {
+    interaction: MessageComponentInteraction,
+    shard: ShardMessenger,
+}
+
+/// TODO: rework this system and reduce cloning
+fn event_handler<'a>(
+    serenity_ctx: &'a serenity::Context,
+    event: &'a poise::Event<'a>,
+    ctx: poise::FrameworkContext<'a, Data, Error>,
+    _data: &'a Data,
+) -> BoxFuture<'a, Result<(), Error>> {
+    use serenity::Interaction;
+
+    if let poise::Event::InteractionCreate {
+        interaction: Interaction::MessageComponent(interaction),
+    } = event
+    {
+        if interaction.message.author.id == ctx.bot_id {
+            let create_value = || {
+                let message = ComponentMessage {
+                    interaction: interaction.clone(),
+                    shard: serenity_ctx.shard.clone(),
+                };
+
+                Arc::new(message)
+            };
+
+            ctx.user_data
+                .send_message_with::<Arc<ComponentMessage>, _>(create_value);
+        }
+    }
+
+    Box::pin(async move { Ok(()) })
 }
