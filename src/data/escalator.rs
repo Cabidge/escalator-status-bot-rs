@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use super::status::Status;
 
-#[derive(sqlx::FromRow, Clone, Copy, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Escalator {
     #[sqlx(flatten)]
     pub floors: EscalatorFloors,
@@ -10,7 +10,7 @@ pub struct Escalator {
     pub status: Status,
 }
 
-#[derive(sqlx::FromRow, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(sqlx::FromRow, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EscalatorFloors {
     #[sqlx(rename = "floor_start", try_from = "i16")]
     pub start: u8,
