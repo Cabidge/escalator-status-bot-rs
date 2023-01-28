@@ -149,7 +149,7 @@ impl AnnounceTask {
         let time_since_last = now.duration_since(last_announcement);
 
         // TODO: figure this out
-        let delay = if self.min_interval < self.max_interval - time_since_last {
+        let delay = if self.min_interval + time_since_last < self.max_interval {
             self.max_interval - time_since_last
         } else {
             self.min_interval
