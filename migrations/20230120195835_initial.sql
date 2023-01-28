@@ -27,11 +27,11 @@ CREATE TABLE alerts (
 
 CREATE TABLE announcement_channels (
     guild_id bigint PRIMARY KEY,
-    channel_id, bigint NOT NULL,
+    channel_id, bigint NOT NULL
 );
 
 CREATE TABLE menu_messages (
     guild_id bigint PRIMARY KEY,
     channel_id, bigint NOT NULL,
-    message_id, bigint NOT NULL,
+    message_id, bigint NOT NULL
 );
