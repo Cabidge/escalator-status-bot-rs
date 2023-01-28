@@ -8,7 +8,7 @@ mod prelude;
 use bot_tasks::{
     alert::AlertTask,
     announce::AnnounceTask,
-    menus::{report::ReportTask, sync::SyncTask},
+    menus::{info::InfoTask, report::ReportTask, sync::SyncTask},
     BotTask,
 };
 use futures::future::BoxFuture;
@@ -69,6 +69,7 @@ async fn init(
     let bot = EscalatorBot::new(framework)
         .add_task(AnnounceTask::default())
         .add_task(AlertTask)
+        .add_task(InfoTask)
         .add_task(ReportTask)
         .add_task(SyncTask);
 

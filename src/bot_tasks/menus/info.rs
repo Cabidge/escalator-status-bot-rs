@@ -12,7 +12,7 @@ use poise::async_trait;
 use std::sync::Arc;
 use tokio::sync::broadcast::{self, error::RecvError};
 
-pub struct ReportTask;
+pub struct InfoTask;
 
 pub struct TaskData {
     interactions: broadcast::Receiver<Arc<ComponentMessage>>,
@@ -52,7 +52,7 @@ lazy_static! {
 }
 
 #[async_trait]
-impl BotTask for ReportTask {
+impl BotTask for InfoTask {
     type Data = TaskData;
     type Term = anyhow::Result<()>;
 
