@@ -59,8 +59,8 @@ impl BotTask for AlertTask {
             let mut ends: SmallVec<[_; 2]> = smallvec![];
 
             for &EscalatorFloors { start, end } in &report.affected_escalators {
-                starts.push(start);
-                ends.push(end);
+                starts.push(start as i16);
+                ends.push(end as i16);
             }
 
             let users = sqlx::query_as::<_, (i64,)>(
