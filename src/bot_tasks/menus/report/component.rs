@@ -2,6 +2,7 @@ use crate::{
     data::{escalator_input::EscalatorInput, status::Status},
     generate::REPORT_EMOJI,
     prelude::*,
+    ui::{self, Component, ViewBuilder},
 };
 
 use super::Report;
@@ -32,11 +33,6 @@ enum EscalatorComponent {
     All,
 }
 
-pub enum ComponentStatus<T> {
-    Continue,
-    Complete(T),
-}
-
 pub enum ComponentAction {
     Escalator(EscalatorAction),
     Status(Status),
@@ -64,66 +60,8 @@ impl ReportComponent {
         }
     }
 
-    pub fn render(&self) -> serenity::CreateComponents {
-        let mut components = serenity::CreateComponents::default();
-
-        // add escalator components
-        components.0.append(&mut self.escalators.render().0);
-
-        // selecting status
-        components
-            .create_action_row(|action_row| {
-                for status in [Status::Open, Status::Down, Status::Blocked] {
-                    let id = format!("{}{}", STATUS_BUTTON_ID_PREFIX, status.as_id_str());
-                    let mut button = ButtonState::selected_if(Some(status) == self.status)
-                        .or_else(|| ButtonState::disabled_if(self.status.is_some()))
-                        .create_button("", id);
-
-                    button.emoji(status.emoji());
-
-                    action_row.add_button(button);
-                }
-
-                action_row
-            })
-            .create_action_row(|action_row| action_row.add_button(self.create_submit_button()));
-
-        components
-    }
-
-    pub fn execute(&mut self, command: ComponentAction) -> ComponentStatus<Report> {
-        match command {
-            ComponentAction::Escalator(command) => {
-                self.escalators.execute(command);
-                ComponentStatus::Continue
-            }
-            ComponentAction::Status(status) => {
-                match self.status {
-                    Some(old_status) if old_status == status => {
-                        self.status = None;
-                    }
-                    Some(_) => (),
-                    None => self.status = Some(status),
-                }
-
-                ComponentStatus::Continue
-            }
-            ComponentAction::Submit => match self.try_as_report() {
-                Some(report) => ComponentStatus::Complete(report),
-                None => ComponentStatus::Continue,
-            },
-        }
-    }
-
-    fn try_as_report(&self) -> Option<Report> {
-        let escalators = self.escalators.try_as_escalators()?;
-        let status = self.status?;
-
-        Some(Report { escalators, status })
-    }
-
     fn create_submit_button(&self) -> serenity::CreateButton {
-        let Some(escalators) = self.escalators.try_as_escalators() else {
+        let Some(escalators) = self.escalators.conclude() else {
             return Self::disabled_submit_button("Select Escalator(s)");
         };
 
@@ -155,69 +93,72 @@ impl ReportComponent {
     }
 }
 
+impl Component for ReportComponent {
+    type Action = ComponentAction;
+    type ActionErr = anyhow::Error;
+    type Output = Report;
+
+    fn render(&self, view: &mut ui::ViewBuilder) {
+        // add escalator components
+        self.escalators.render(view);
+
+        // selecting status
+        view.row(|action_row| {
+            for status in [Status::Open, Status::Down, Status::Blocked] {
+                let id = format!("{}{}", STATUS_BUTTON_ID_PREFIX, status.as_id_str());
+                let mut button = ButtonState::selected_if(Some(status) == self.status)
+                    .or_else(|| ButtonState::disabled_if(self.status.is_some()))
+                    .create_button("", id);
+
+                button.emoji(status.emoji());
+
+                action_row.add_button(button);
+            }
+
+            action_row
+        })
+        .row(|action_row| action_row.add_button(self.create_submit_button()));
+    }
+
+    fn update(&mut self, action: Self::Action) -> Option<ui::Update> {
+        match action {
+            ComponentAction::Escalator(action) => self.escalators.update(action),
+            ComponentAction::Status(status) => {
+                match self.status {
+                    Some(old_status) if old_status == status => {
+                        self.status = None;
+                    }
+                    Some(_) => (),
+                    None => self.status = Some(status),
+                }
+
+                Some(ui::Update::Render)
+            }
+            ComponentAction::Submit => Some(ui::Update::Halt),
+        }
+    }
+
+    fn conclude(self) -> Option<Self::Output> {
+        let escalators = self.escalators.conclude()?;
+        let status = self.status?;
+
+        Some(Report { escalators, status })
+    }
+
+    fn render_output(report: &Self::Output, view: &mut ViewBuilder) {
+        view.add_content(&format!(
+            "`{}` Successfully reported {}.",
+            report.status.emoji(),
+            report.escalators.message_noun(),
+        ));
+    }
+}
+
 impl EscalatorComponent {
     fn new() -> Self {
         Self::Floors {
             floors: None,
             pair: false,
-        }
-    }
-
-    fn try_as_escalators(&self) -> Option<EscalatorInput> {
-        match self {
-            &Self::Floors {
-                floors: Some((start, Some(end))),
-                pair,
-            } => {
-                if pair {
-                    Some(EscalatorInput::Pair(start, end))
-                } else {
-                    Some(EscalatorInput::Direct(start, end))
-                }
-            }
-            Self::All => Some(EscalatorInput::All),
-            _ => None,
-        }
-    }
-
-    fn render(&self) -> serenity::CreateComponents {
-        const NUMBER_PANEL: [[u8; 4]; 2] = [[2, 4, 6, 8], [3, 5, 7, 9]];
-
-        let mut components = serenity::CreateComponents::default();
-
-        for (row, numbers) in NUMBER_PANEL.into_iter().enumerate() {
-            components.create_action_row(|action_row| {
-                for floor in numbers {
-                    action_row.add_button(self.create_floor_button(floor));
-                }
-
-                let button = match row {
-                    // top row
-                    0 => self.create_pair_button(),
-                    // bottom row
-                    1 => self.create_all_button(),
-                    _ => unreachable!(),
-                };
-
-                action_row.add_button(button)
-            });
-        }
-
-        components
-    }
-
-    fn execute(&mut self, command: EscalatorAction) {
-        match command {
-            EscalatorAction::Pair => {
-                if let Self::Floors { pair, .. } = self {
-                    *pair = !*pair
-                }
-            }
-            EscalatorAction::All => match self {
-                Self::Floors { .. } => *self = Self::All,
-                Self::All => *self = Self::new(),
-            },
-            EscalatorAction::Floor(floor) => self.toggle_floor(floor),
         }
     }
 
@@ -253,13 +194,13 @@ impl EscalatorComponent {
         }
     }
 
-    fn toggle_floor(&mut self, floor: u8) {
+    fn toggle_floor(&mut self, floor: u8) -> Option<ui::Update> {
         match self {
             Self::Floors { floors, .. } => {
                 // if no floors are selected, set the start to the selected floor
                 let Some((start, maybe_end)) = floors else {
                     *floors = Some((floor, None));
-                    return;
+                    return Some(ui::Update::Render);
                 };
 
                 // if the start is the selected floor
@@ -272,25 +213,26 @@ impl EscalatorComponent {
                     } else {
                         *floors = None;
                     }
-                    return;
+                    return Some(ui::Update::Render);
                 }
 
                 // if the end is not selected
                 let Some(end) = maybe_end else {
                     // if the start and selected floor create a valid escalator,
                     // set the end to the selected floor
-                    if is_valid_escalator(*start, floor) {
+                    return is_valid_escalator(*start, floor).then(|| {
                         *maybe_end = Some(floor);
-                    }
-                    return;
+                        ui::Update::Render
+                    });
                 };
 
                 // if the end is the selected floor, unselect the end
-                if *end == floor {
+                (*end == floor).then(|| {
                     *maybe_end = None;
-                }
+                    ui::Update::Render
+                })
             }
-            Self::All => (),
+            Self::All => None,
         }
     }
 
@@ -312,6 +254,73 @@ impl EscalatorComponent {
                 None => true,
             },
             Self::All => false,
+        }
+    }
+}
+
+impl Component for EscalatorComponent {
+    type Action = EscalatorAction;
+    type ActionErr = anyhow::Error;
+    type Output = EscalatorInput;
+
+    fn render(&self, view: &mut ViewBuilder) {
+        const NUMBER_PANEL: [[u8; 4]; 2] = [[2, 4, 6, 8], [3, 5, 7, 9]];
+
+        for (row, numbers) in NUMBER_PANEL.into_iter().enumerate() {
+            view.row(|action_row| {
+                for floor in numbers {
+                    action_row.add_button(self.create_floor_button(floor));
+                }
+
+                let button = match row {
+                    // top row
+                    0 => self.create_pair_button(),
+                    // bottom row
+                    1 => self.create_all_button(),
+                    _ => unreachable!(),
+                };
+
+                action_row.add_button(button)
+            });
+        }
+    }
+
+    fn update(&mut self, action: Self::Action) -> Option<ui::Update> {
+        match action {
+            EscalatorAction::Pair => {
+                let Self::Floors { pair, .. } = self else {
+                    return None;
+                };
+
+                *pair = !*pair;
+                Some(ui::Update::Render)
+            }
+            EscalatorAction::All => {
+                match self {
+                    Self::Floors { .. } => *self = Self::All,
+                    Self::All => *self = Self::new(),
+                }
+
+                Some(ui::Update::Render)
+            }
+            EscalatorAction::Floor(floor) => self.toggle_floor(floor),
+        }
+    }
+
+    fn conclude(self) -> Option<Self::Output> {
+        match self {
+            Self::Floors {
+                floors: Some((start, Some(end))),
+                pair,
+            } => {
+                if pair {
+                    Some(EscalatorInput::Pair(start, end))
+                } else {
+                    Some(EscalatorInput::Direct(start, end))
+                }
+            }
+            Self::All => Some(EscalatorInput::All),
+            _ => None,
         }
     }
 }
