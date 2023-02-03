@@ -1,5 +1,6 @@
 pub mod data;
 pub mod generate;
+pub mod ui;
 
 mod bot_tasks;
 mod commands;
