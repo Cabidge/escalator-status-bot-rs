@@ -5,7 +5,7 @@ use crate::prelude::*;
 
 use super::{
     view::View, Component, UiConfig, UiError, UiResult, Signal, Update, UserInterface,
-    ViewBuilder,
+    ViewBuilder, CustomError,
 };
 
 use futures::StreamExt;
@@ -78,7 +78,8 @@ impl<T: MessageContext<'a> + 'a, 'a> UserInterface<'a> for MessageInterface<T> {
 
             self.ctx
                 .send(view.build(), config.ephemeral, http, &self.shard)
-                .await?
+                .await
+                .map_err(CustomError::new)?
         };
 
         let conclusion = loop {
@@ -97,7 +98,7 @@ impl<T: MessageContext<'a> + 'a, 'a> UserInterface<'a> for MessageInterface<T> {
                         break Conclusion::Halt;
                     };
 
-                    interaction.defer(&http).await?;
+                    interaction.defer(&http).await.map_err(CustomError::new)?;
 
                     let Ok(action) = interaction.data.custom_id.parse::<C::Action>()  else {
                         log::warn!("An error ocurred parsing a component command");
@@ -132,7 +133,7 @@ impl<T: MessageContext<'a> + 'a, 'a> UserInterface<'a> for MessageInterface<T> {
 
                     component.render(&mut view);
 
-                    handle.edit(view.build(), http).await?;
+                    handle.edit(view.build(), http).await.map_err(CustomError::new)?;
                 }
             }
         };
@@ -140,12 +141,12 @@ impl<T: MessageContext<'a> + 'a, 'a> UserInterface<'a> for MessageInterface<T> {
         if conclusion == Conclusion::Timeout {
             handle
                 .edit(ViewBuilder::with_content("*timed out*").build(), http)
-                .await?;
+                .await.map_err(CustomError::new)?;
             return Err(UiError::Timeout);
         }
 
         let Some(output) = component.conclude() else {
-            handle.edit(ViewBuilder::with_content("*interaction failed to complete*").build(), http).await?;
+            handle.edit(ViewBuilder::with_content("*interaction failed to complete*").build(), http).await.map_err(CustomError::new)?;
             return Err(UiError::Incomplete);
         };
 

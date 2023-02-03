@@ -62,11 +62,15 @@ pub struct UiConfig {
     pub timeout: Option<Timeout>,
 }
 
+#[derive(Debug)]
 pub enum UiError {
     Timeout,
     Incomplete,
-    Custom(anyhow::Error),
+    Custom(CustomError),
 }
+
+#[derive(Debug)]
+pub struct CustomError(anyhow::Error);
 
 pub struct UiHandle<'a, C: Component> {
     emitter: Sender<Signal<C>>,
@@ -110,8 +114,34 @@ impl<'a, C: Component> Future for UiHandle<'a, C> {
     }
 }
 
-impl<E: std::error::Error + Send + Sync + 'static> From<E> for UiError {
-    fn from(value: E) -> Self {
-        Self::Custom(value.into())
+impl Display for UiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UiError::Timeout => write!(f, "Interface timed out"),
+            UiError::Incomplete => write!(f, "Interface did not complete"),
+            UiError::Custom(err) => err.fmt(f),
+        }
     }
 }
+
+impl CustomError {
+    pub fn new(e: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self(anyhow::Error::new(e))
+    }
+}
+
+impl Display for CustomError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl From<CustomError> for UiError {
+    fn from(value: CustomError) -> Self {
+        Self::Custom(value)
+    }
+}
+
+impl std::error::Error for UiError {}
+
+impl std::error::Error for CustomError {}
