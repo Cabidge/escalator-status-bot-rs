@@ -11,7 +11,7 @@ pub use self::{
 
 use futures::{Future, FutureExt};
 use poise::async_trait;
-use std::{pin::Pin, str::FromStr};
+use std::{pin::Pin, str::FromStr, fmt::Display};
 
 pub type UiResult<C> = Result<<C as Component>::Output, UiError>;
 
@@ -20,11 +20,12 @@ type Sender<T> = tokio::sync::mpsc::UnboundedSender<T>;
 
 pub trait Component: Sized + Send + Sync + 'static {
     type Action: FromStr<Err = Self::ActionErr> + Send;
-    type ActionErr: std::error::Error + Send;
-    type Output: TryFrom<Self> + Send;
+    type ActionErr: Display + Send;
+    type Output: Send;
 
     fn render(&self, view: &mut ViewBuilder);
     fn update(&mut self, action: Self::Action) -> Option<Update>;
+    fn conclude(self) -> Option<Self::Output>;
 
     fn render_output(_output: &Self::Output, view: &mut ViewBuilder) {
         view.add_content("*interaction ended*");
@@ -34,10 +35,6 @@ pub trait Component: Sized + Send + Sync + 'static {
         let mut view = ViewBuilder::new();
         self.render(&mut view);
         view
-    }
-
-    fn conclude(self) -> Option<Self::Output> {
-        self.try_into().ok()
     }
 }
 
