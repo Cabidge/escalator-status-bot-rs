@@ -70,7 +70,7 @@ pub enum UiError {
 
 pub struct UiHandle<'a, C: Component> {
     emitter: Sender<Signal<C>>,
-    task: Pin<Box<dyn Future<Output = UiResult<C>> + 'a>>,
+    task: Pin<Box<dyn Future<Output = UiResult<C>> + Send + 'a>>,
 }
 
 pub enum Signal<C: Component> {
