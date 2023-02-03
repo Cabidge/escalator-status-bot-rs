@@ -11,7 +11,7 @@ pub use self::{
 
 use futures::{Future, FutureExt};
 use poise::async_trait;
-use std::{pin::Pin, str::FromStr, fmt::Display};
+use std::{fmt::Display, pin::Pin, str::FromStr};
 
 pub type UiResult<C> = Result<<C as Component>::Output, UiError>;
 

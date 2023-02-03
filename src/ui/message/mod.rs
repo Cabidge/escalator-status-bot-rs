@@ -4,8 +4,8 @@ pub mod poise_context;
 use crate::prelude::*;
 
 use super::{
-    view::View, Component, UiConfig, UiError, UiResult, Signal, Update, UserInterface,
-    ViewBuilder, CustomError,
+    view::View, Component, CustomError, Signal, UiConfig, UiError, UiResult, Update, UserInterface,
+    ViewBuilder,
 };
 
 use futures::StreamExt;
@@ -133,7 +133,10 @@ impl<T: MessageContext<'a> + 'a, 'a> UserInterface<'a> for MessageInterface<T> {
 
                     component.render(&mut view);
 
-                    handle.edit(view.build(), http).await.map_err(CustomError::new)?;
+                    handle
+                        .edit(view.build(), http)
+                        .await
+                        .map_err(CustomError::new)?;
                 }
             }
         };
@@ -141,7 +144,8 @@ impl<T: MessageContext<'a> + 'a, 'a> UserInterface<'a> for MessageInterface<T> {
         if conclusion == Conclusion::Timeout {
             handle
                 .edit(ViewBuilder::with_content("*timed out*").build(), http)
-                .await.map_err(CustomError::new)?;
+                .await
+                .map_err(CustomError::new)?;
             return Err(UiError::Timeout);
         }
 

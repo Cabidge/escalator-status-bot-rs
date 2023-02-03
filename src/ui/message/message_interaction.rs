@@ -1,8 +1,13 @@
-use poise::{serenity_prelude::{MessageComponentInteraction, ComponentInteractionCollector, Http, ShardMessenger}, async_trait};
+use poise::{
+    async_trait,
+    serenity_prelude::{
+        ComponentInteractionCollector, Http, MessageComponentInteraction, ShardMessenger,
+    },
+};
 
 use crate::{prelude::*, ui::view::View};
 
-use super::{MessageHandle, MessageContext};
+use super::{MessageContext, MessageHandle};
 
 pub struct MessageComponentHandle {
     interaction: MessageComponentInteraction,
@@ -26,24 +31,31 @@ impl<'a> MessageContext<'a> for MessageComponentInteraction {
                     .set_components(view.rows.into())
                     .ephemeral(ephemeral)
             })
-        }).await?;
+        })
+        .await?;
 
-        let collector = self.get_interaction_response(http)
+        let collector = self
+            .get_interaction_response(http)
             .await?
             .await_component_interactions(shard)
             .build();
 
-        Ok(MessageComponentHandle { interaction: self, collector })
+        Ok(MessageComponentHandle {
+            interaction: self,
+            collector,
+        })
     }
 }
 
 #[async_trait]
 impl MessageHandle for MessageComponentHandle {
     async fn edit(&mut self, view: View, http: &Http) -> Result<(), serenity::Error> {
-        self.interaction.edit_original_interaction_response(http, |res| {
-            res.content(view.content)
-                .components(replace_builder_with(view.rows.into()))
-        }).await?;
+        self.interaction
+            .edit_original_interaction_response(http, |res| {
+                res.content(view.content)
+                    .components(replace_builder_with(view.rows.into()))
+            })
+            .await?;
 
         Ok(())
     }

@@ -1,4 +1,4 @@
-use crate::{ui::view::View, prelude::*};
+use crate::{prelude::*, ui::view::View};
 
 use super::{MessageContext, MessageHandle};
 use poise::{
