@@ -17,9 +17,9 @@ use std::{future, sync::Arc};
 use tokio::sync::mpsc;
 
 pub struct MessageInterface<H> {
-    handle: H,
-    http: Arc<Http>,
-    shard: ShardMessenger,
+    pub handle: H,
+    pub http: Arc<Http>,
+    pub shard: ShardMessenger,
 }
 
 #[async_trait]
