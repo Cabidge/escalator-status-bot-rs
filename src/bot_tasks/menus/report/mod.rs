@@ -5,7 +5,9 @@ use crate::{
     data::{escalator_input::EscalatorInput, report::UserReport, status::Status},
     generate::REPORT_BUTTON_ID,
     prelude::*,
-    ui::{MessageContext, Timeout, TimeoutKind, UiConfig, UserInterface},
+    ui::{
+        MessageContext, MessageHandle, Timeout, TimeoutKind, UiConfig, UserInterface, ViewBuilder,
+    },
     ComponentMessage,
 };
 
@@ -118,11 +120,17 @@ async fn handle_report(
         .bind(true, http, event.shard.clone())
         .await?;
 
-    let report = ui
-        .mount(report, config)
-        .await?;
+    let report = ui.mount(report, config).await?;
 
-    let affected_escalators = commit_report(pool, report).await?;
+    let affected_escalators = match commit_report(pool, report).await {
+        Ok(e) => e,
+        Err(err) => {
+            let response = ViewBuilder::with_content("A database error ocurred...").build();
+            ui.handle.edit(response, &ui.http).await?;
+
+            return Err(err.into());
+        }
+    };
 
     let full_report = UserReport {
         reporter: Some(event.interaction.user.id),
