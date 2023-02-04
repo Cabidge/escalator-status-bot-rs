@@ -32,7 +32,7 @@ impl<'a> MessageContext<'a> for MessageComponentInteraction {
 
 #[async_trait]
 impl MessageHandle for MessageComponentInteraction {
-    async fn edit(&mut self, view: View, http: &Http) -> Result<(), serenity::Error> {
+    async fn edit(&self, view: View, http: &Http) -> Result<(), serenity::Error> {
         self.edit_original_interaction_response(http, |res| {
             res.content(view.content)
                 .components(replace_builder_with(view.rows.into()))
@@ -42,7 +42,7 @@ impl MessageHandle for MessageComponentInteraction {
         Ok(())
     }
 
-    async fn message(&mut self, http: &Http) -> Result<serenity::Message, serenity::Error> {
+    async fn message(&self, http: &Http) -> Result<serenity::Message, serenity::Error> {
         self.get_interaction_response(http).await
     }
 }

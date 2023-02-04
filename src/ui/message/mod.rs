@@ -50,8 +50,8 @@ enum Conclusion {
 
 #[async_trait]
 pub trait MessageHandle: Send + Sync {
-    async fn edit(&mut self, view: View, http: &Http) -> Result<(), serenity::Error>;
-    async fn message(&mut self, http: &Http) -> Result<serenity::Message, serenity::Error>;
+    async fn edit(&self, view: View, http: &Http) -> Result<(), serenity::Error>;
+    async fn message(&self, http: &Http) -> Result<serenity::Message, serenity::Error>;
 }
 
 #[async_trait]
@@ -66,7 +66,7 @@ impl<T: MessageContext<'a> + 'a, 'a> UserInterface<'a> for MessageInterface<T> {
 
         let mut timeout = config.sleeper();
 
-        let mut handle = {
+        let handle = {
             let mut view = if let Some(sleeper) = &timeout {
                 ViewBuilder::with_timeout(sleeper)
             } else {

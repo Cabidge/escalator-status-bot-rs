@@ -28,13 +28,13 @@ impl<'a> MessageContext<'a> for Context<'a> {
 
 #[async_trait]
 impl<'a> MessageHandle for PoiseContextHandle<'a> {
-    async fn edit(&mut self, view: View, _http: &Http) -> Result<(), serenity::Error> {
+    async fn edit(&self, view: View, _http: &Http) -> Result<(), serenity::Error> {
         self.reply
             .edit(self.ctx, |reply| create_view_reply(reply, view))
             .await
     }
 
-    async fn message(&mut self, _http: &Http) -> Result<serenity::Message, serenity::Error> {
+    async fn message(&self, _http: &Http) -> Result<serenity::Message, serenity::Error> {
         self.reply.message().await.map(|msg| msg.into_owned())
     }
 }
