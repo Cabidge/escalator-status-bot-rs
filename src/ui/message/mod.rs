@@ -33,8 +33,19 @@ pub trait MessageContext: Sized + Send {
         http: &Http,
     ) -> Result<Self::Handle, serenity::Error>;
 
-    async fn bind(self, ephemeral: bool, http: Arc<Http>, shard: ShardMessenger) -> Result<MessageInterface<Self::Handle>, serenity::Error> {
-        let handle = self.send(ViewBuilder::with_content("*initializing...*").build(), ephemeral, &http).await?;
+    async fn bind(
+        self,
+        ephemeral: bool,
+        http: Arc<Http>,
+        shard: ShardMessenger,
+    ) -> Result<MessageInterface<Self::Handle>, serenity::Error> {
+        let handle = self
+            .send(
+                ViewBuilder::with_content("*initializing...*").build(),
+                ephemeral,
+                &http,
+            )
+            .await?;
 
         Ok(MessageInterface {
             handle,
@@ -75,7 +86,8 @@ impl<T: MessageHandle> UserInterface for MessageInterface<T> {
 
         let mut timeout = config.sleeper();
 
-        let mut collector = self.handle
+        let mut collector = self
+            .handle
             .message(http)
             .await
             .map_err(CustomError::new)?
