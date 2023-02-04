@@ -1,29 +1,21 @@
 use poise::{
     async_trait,
-    serenity_prelude::{
-        ComponentInteractionCollector, Http, MessageComponentInteraction, ShardMessenger,
-    },
+    serenity_prelude::{Http, MessageComponentInteraction},
 };
 
 use crate::{prelude::*, ui::view::View};
 
 use super::{MessageContext, MessageHandle};
 
-pub struct MessageComponentHandle {
-    interaction: MessageComponentInteraction,
-    collector: ComponentInteractionCollector,
-}
-
 #[async_trait]
 impl<'a> MessageContext<'a> for MessageComponentInteraction {
-    type Handle = MessageComponentHandle;
+    type Handle = Self;
 
     async fn send(
         self,
         view: View,
         ephemeral: bool,
         http: &Http,
-        shard: &ShardMessenger,
     ) -> Result<Self::Handle, serenity::Error> {
         self.create_interaction_response(http, |res| {
             res.interaction_response_data(|data| {
@@ -34,33 +26,23 @@ impl<'a> MessageContext<'a> for MessageComponentInteraction {
         })
         .await?;
 
-        let collector = self
-            .get_interaction_response(http)
-            .await?
-            .await_component_interactions(shard)
-            .build();
-
-        Ok(MessageComponentHandle {
-            interaction: self,
-            collector,
-        })
+        Ok(self)
     }
 }
 
 #[async_trait]
-impl MessageHandle for MessageComponentHandle {
+impl MessageHandle for MessageComponentInteraction {
     async fn edit(&mut self, view: View, http: &Http) -> Result<(), serenity::Error> {
-        self.interaction
-            .edit_original_interaction_response(http, |res| {
-                res.content(view.content)
-                    .components(replace_builder_with(view.rows.into()))
-            })
-            .await?;
+        self.edit_original_interaction_response(http, |res| {
+            res.content(view.content)
+                .components(replace_builder_with(view.rows.into()))
+        })
+        .await?;
 
         Ok(())
     }
 
-    fn collector(&mut self) -> &mut ComponentInteractionCollector {
-        &mut self.collector
+    async fn message(&mut self, http: &Http) -> Result<serenity::Message, serenity::Error> {
+        self.get_interaction_response(http).await
     }
 }

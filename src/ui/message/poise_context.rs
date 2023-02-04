@@ -1,16 +1,11 @@
 use crate::{prelude::*, ui::view::View};
 
 use super::{MessageContext, MessageHandle};
-use poise::{
-    async_trait,
-    serenity_prelude::{ComponentInteractionCollector, Http, ShardMessenger},
-    CreateReply, ReplyHandle,
-};
+use poise::{async_trait, serenity_prelude::Http, CreateReply, ReplyHandle};
 
 pub struct PoiseContextHandle<'a> {
     ctx: Context<'a>,
     reply: ReplyHandle<'a>,
-    collector: ComponentInteractionCollector,
 }
 
 #[async_trait]
@@ -22,23 +17,12 @@ impl<'a> MessageContext<'a> for Context<'a> {
         view: View,
         ephemeral: bool,
         _http: &Http,
-        shard: &ShardMessenger,
     ) -> Result<Self::Handle, serenity::Error> {
         let reply = self
             .send(|reply| create_view_reply(reply, view).ephemeral(ephemeral))
             .await?;
 
-        let collector = reply
-            .message()
-            .await?
-            .await_component_interactions(shard)
-            .build();
-
-        Ok(PoiseContextHandle {
-            ctx: self,
-            reply,
-            collector,
-        })
+        Ok(PoiseContextHandle { ctx: self, reply })
     }
 }
 
@@ -50,8 +34,8 @@ impl<'a> MessageHandle for PoiseContextHandle<'a> {
             .await
     }
 
-    fn collector(&mut self) -> &mut ComponentInteractionCollector {
-        &mut self.collector
+    async fn message(&mut self, _http: &Http) -> Result<serenity::Message, serenity::Error> {
+        self.reply.message().await.map(|msg| msg.into_owned())
     }
 }
 

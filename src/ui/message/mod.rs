@@ -11,7 +11,7 @@ use super::{
 use futures::StreamExt;
 use poise::{
     async_trait,
-    serenity_prelude::{ComponentInteractionCollector, Http, ShardMessenger},
+    serenity_prelude::{Http, ShardMessenger},
 };
 use std::{future, sync::Arc};
 use tokio::sync::mpsc;
@@ -31,7 +31,6 @@ pub trait MessageContext<'a>: Sized + Send {
         view: View,
         ephemeral: bool,
         http: &Http,
-        shard: &ShardMessenger,
     ) -> Result<Self::Handle, serenity::Error>;
 
     fn bind(self, http: Arc<Http>, shard: ShardMessenger) -> MessageInterface<Self> {
@@ -52,7 +51,7 @@ enum Conclusion {
 #[async_trait]
 pub trait MessageHandle: Send + Sync {
     async fn edit(&mut self, view: View, http: &Http) -> Result<(), serenity::Error>;
-    fn collector(&mut self) -> &mut ComponentInteractionCollector;
+    async fn message(&mut self, http: &Http) -> Result<serenity::Message, serenity::Error>;
 }
 
 #[async_trait]
@@ -77,10 +76,17 @@ impl<T: MessageContext<'a> + 'a, 'a> UserInterface<'a> for MessageInterface<T> {
             component.render(&mut view);
 
             self.ctx
-                .send(view.build(), config.ephemeral, http, &self.shard)
+                .send(view.build(), config.ephemeral, http)
                 .await
                 .map_err(CustomError::new)?
         };
+
+        let mut collector = handle
+            .message(http)
+            .await
+            .map_err(CustomError::new)?
+            .await_component_interactions(&self.shard)
+            .build();
 
         let conclusion = loop {
             let wait_for_timeout = async {
@@ -93,7 +99,7 @@ impl<T: MessageContext<'a> + 'a, 'a> UserInterface<'a> for MessageInterface<T> {
             };
 
             let signal = tokio::select! {
-                collected = handle.collector().next() => {
+                collected = collector.next() => {
                     let Some(interaction) = collected else {
                         break Conclusion::Halt;
                     };
