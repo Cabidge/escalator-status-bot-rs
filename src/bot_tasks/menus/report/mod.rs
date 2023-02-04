@@ -109,14 +109,16 @@ async fn handle_report(
     };
 
     let config = UiConfig {
-        ephemeral: true,
         timeout: Some(timeout),
     };
 
-    let report = event
+    let ui = event
         .interaction
         .to_owned()
-        .bind(http, event.shard.clone())
+        .bind(true, http, event.shard.clone())
+        .await?;
+
+    let report = ui
         .mount(report, config)
         .await?;
 

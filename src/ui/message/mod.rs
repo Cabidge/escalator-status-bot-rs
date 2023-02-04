@@ -16,15 +16,15 @@ use poise::{
 use std::{future, sync::Arc};
 use tokio::sync::mpsc;
 
-pub struct MessageInterface<Ctx> {
-    ctx: Ctx,
+pub struct MessageInterface<H> {
+    handle: H,
     http: Arc<Http>,
     shard: ShardMessenger,
 }
 
 #[async_trait]
-pub trait MessageContext<'a>: Sized + Send {
-    type Handle: MessageHandle + 'a;
+pub trait MessageContext: Sized + Send {
+    type Handle: MessageHandle;
 
     async fn send(
         self,
@@ -33,12 +33,14 @@ pub trait MessageContext<'a>: Sized + Send {
         http: &Http,
     ) -> Result<Self::Handle, serenity::Error>;
 
-    fn bind(self, http: Arc<Http>, shard: ShardMessenger) -> MessageInterface<Self> {
-        MessageInterface {
-            ctx: self,
+    async fn bind(self, ephemeral: bool, http: Arc<Http>, shard: ShardMessenger) -> Result<MessageInterface<Self::Handle>, serenity::Error> {
+        let handle = self.send(ViewBuilder::with_content("*initializing...*").build(), ephemeral, &http).await?;
+
+        Ok(MessageInterface {
+            handle,
             http,
             shard,
-        }
+        })
     }
 }
 
@@ -55,38 +57,40 @@ pub trait MessageHandle: Send + Sync {
 }
 
 #[async_trait]
-impl<T: MessageContext<'a> + 'a, 'a> UserInterface<'a> for MessageInterface<T> {
+impl<T: MessageHandle> UserInterface for MessageInterface<T> {
     async fn run<C: Component>(
-        self,
+        &self,
         mut component: C,
         config: UiConfig,
         mut signals: mpsc::UnboundedReceiver<Signal<C>>,
     ) -> UiResult<C> {
         let http = &self.http;
 
-        let mut timeout = config.sleeper();
-
-        let handle = {
-            let mut view = if let Some(sleeper) = &timeout {
-                ViewBuilder::with_timeout(sleeper)
-            } else {
-                ViewBuilder::default()
-            };
-
-            component.render(&mut view);
-
-            self.ctx
-                .send(view.build(), config.ephemeral, http)
+        let show = |view: ViewBuilder| async {
+            self.handle
+                .edit(view.build(), http)
                 .await
-                .map_err(CustomError::new)?
+                .map_err(CustomError::new)
         };
 
-        let mut collector = handle
+        let mut timeout = config.sleeper();
+
+        let mut collector = self.handle
             .message(http)
             .await
             .map_err(CustomError::new)?
             .await_component_interactions(&self.shard)
             .build();
+
+        let mut view = if let Some(sleeper) = &mut timeout {
+            ViewBuilder::with_timeout(sleeper)
+        } else {
+            ViewBuilder::default()
+        };
+
+        component.render(&mut view);
+
+        show(view).await?;
 
         let conclusion = loop {
             let wait_for_timeout = async {
@@ -139,16 +143,13 @@ impl<T: MessageContext<'a> + 'a, 'a> UserInterface<'a> for MessageInterface<T> {
 
                     component.render(&mut view);
 
-                    handle
-                        .edit(view.build(), http)
-                        .await
-                        .map_err(CustomError::new)?;
+                    show(view).await?;
                 }
             }
         };
 
         if conclusion == Conclusion::Timeout {
-            handle
+            self.handle
                 .edit(ViewBuilder::with_content("*timed out*").build(), http)
                 .await
                 .map_err(CustomError::new)?;
@@ -156,7 +157,7 @@ impl<T: MessageContext<'a> + 'a, 'a> UserInterface<'a> for MessageInterface<T> {
         }
 
         let Some(output) = component.conclude() else {
-            handle.edit(ViewBuilder::with_content("*interaction failed to complete*").build(), http).await.map_err(CustomError::new)?;
+            self.handle.edit(ViewBuilder::with_content("*interaction failed to complete*").build(), http).await.map_err(CustomError::new)?;
             return Err(UiError::Incomplete);
         };
 

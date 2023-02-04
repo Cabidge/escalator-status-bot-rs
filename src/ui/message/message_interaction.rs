@@ -8,7 +8,7 @@ use crate::{prelude::*, ui::view::View};
 use super::{MessageContext, MessageHandle};
 
 #[async_trait]
-impl<'a> MessageContext<'a> for MessageComponentInteraction {
+impl MessageContext for MessageComponentInteraction {
     type Handle = Self;
 
     async fn send(

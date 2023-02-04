@@ -39,15 +39,15 @@ pub trait Component: Sized + Send + Sync + 'static {
 }
 
 #[async_trait]
-pub trait UserInterface<'a>: Sized + 'a {
+pub trait UserInterface: Sized {
     async fn run<C: Component>(
-        self,
+        &self,
         component: C,
         config: UiConfig,
         signals: Receiver<Signal<C>>,
     ) -> UiResult<C>;
 
-    fn mount<C: Component>(self, component: C, config: UiConfig) -> UiHandle<'a, C> {
+    fn mount<C: Component>(&self, component: C, config: UiConfig) -> UiHandle<C> {
         let (emitter, signals) = tokio::sync::mpsc::unbounded_channel();
         UiHandle {
             emitter,
@@ -58,7 +58,6 @@ pub trait UserInterface<'a>: Sized + 'a {
 
 #[derive(Clone, Default)]
 pub struct UiConfig {
-    pub ephemeral: bool,
     pub timeout: Option<Timeout>,
 }
 

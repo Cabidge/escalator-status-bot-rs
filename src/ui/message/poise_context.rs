@@ -9,7 +9,7 @@ pub struct PoiseContextHandle<'a> {
 }
 
 #[async_trait]
-impl<'a> MessageContext<'a> for Context<'a> {
+impl<'a> MessageContext for Context<'a> {
     type Handle = PoiseContextHandle<'a>;
 
     async fn send(
