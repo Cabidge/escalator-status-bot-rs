@@ -43,7 +43,7 @@ pub trait MessageContext: Sized + Send {
             .send(
                 ViewBuilder::with_content("*initializing...*").build(),
                 ephemeral,
-                &http,
+                http,
             )
             .await?;
 
@@ -91,7 +91,7 @@ impl<'a, T: MessageHandle> UserInterface for MessageInterface<'a, T> {
             .message(http)
             .await
             .map_err(CustomError::new)?
-            .await_component_interactions(&self.shard)
+            .await_component_interactions(self.shard)
             .build();
 
         let mut view = if let Some(sleeper) = &mut timeout {

@@ -126,7 +126,7 @@ async fn handle_report(
         Ok(e) => e,
         Err(err) => {
             let response = ViewBuilder::with_content("A database error ocurred...").build();
-            ui.handle.edit(response, &ui.http).await?;
+            ui.handle.edit(response, ui.http).await?;
 
             return Err(err.into());
         }
