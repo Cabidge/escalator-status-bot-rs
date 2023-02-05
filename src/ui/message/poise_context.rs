@@ -4,8 +4,8 @@ use super::{MessageContext, MessageHandle};
 use poise::{async_trait, serenity_prelude::Http, CreateReply, ReplyHandle};
 
 pub struct PoiseContextHandle<'a> {
-    ctx: Context<'a>,
-    reply: ReplyHandle<'a>,
+    pub ctx: Context<'a>,
+    pub reply: ReplyHandle<'a>,
 }
 
 #[async_trait]
