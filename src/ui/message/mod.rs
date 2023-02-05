@@ -13,13 +13,13 @@ use poise::{
     async_trait,
     serenity_prelude::{Http, ShardMessenger},
 };
-use std::{future, sync::Arc};
+use std::future;
 use tokio::sync::mpsc;
 
-pub struct MessageInterface<H> {
+pub struct MessageInterface<'a, H> {
     pub handle: H,
-    pub http: Arc<Http>,
-    pub shard: ShardMessenger,
+    pub http: &'a Http,
+    pub shard: &'a ShardMessenger,
 }
 
 #[async_trait]
@@ -33,12 +33,12 @@ pub trait MessageContext: Sized + Send {
         http: &Http,
     ) -> Result<Self::Handle, serenity::Error>;
 
-    async fn bind(
+    async fn bind<'a>(
         self,
         ephemeral: bool,
-        http: Arc<Http>,
-        shard: ShardMessenger,
-    ) -> Result<MessageInterface<Self::Handle>, serenity::Error> {
+        http: &'a Http,
+        shard: &'a ShardMessenger,
+    ) -> Result<MessageInterface<'a, Self::Handle>, serenity::Error> {
         let handle = self
             .send(
                 ViewBuilder::with_content("*initializing...*").build(),
@@ -68,7 +68,7 @@ pub trait MessageHandle: Send + Sync {
 }
 
 #[async_trait]
-impl<T: MessageHandle> UserInterface for MessageInterface<T> {
+impl<'a, T: MessageHandle> UserInterface for MessageInterface<'a, T> {
     async fn run<C: Component>(
         &self,
         mut component: C,

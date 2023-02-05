@@ -117,7 +117,7 @@ async fn handle_report(
     let ui = event
         .interaction
         .to_owned()
-        .bind(true, http, event.shard.clone())
+        .bind(true, &http, &event.shard)
         .await?;
 
     let report = ui.mount(report, config).await?;
