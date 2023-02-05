@@ -1,10 +1,11 @@
 use std::{str::FromStr, time::Duration};
 
-use futures::{StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 use indexmap::IndexMap;
 use itertools::Itertools;
+use poise::serenity_prelude::CacheHttp;
 
-use crate::{generate, prelude::*};
+use crate::{prelude::*, ui::{Component, self, MessageContext, UserInterface, Timeout, TimeoutKind, UiConfig}};
 
 type Watchlist = IndexMap<EscalatorFloors, Subscription>;
 
@@ -26,8 +27,6 @@ pub async fn alerts(_ctx: Context<'_>) -> Result<(), Error> {
 /// Edit your watch list and be alerted when any escalator on it gets reported.
 #[poise::command(slash_command, ephemeral = true)]
 pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
-    const TIMEOUT: Duration = Duration::from_secs(2 * 60);
-
     ctx.defer_ephemeral().await?;
 
     let watchlist = match load_watchlist(&ctx.data().pool, ctx.author().id).await {
@@ -40,82 +39,32 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
         }
     };
 
-    let mut watchlist = WatchlistComponent { watchlist };
+    let watchlist = WatchlistComponent { watchlist };
 
-    let handle = ctx
-        .send(|msg| {
-            msg.content(generate::timeout_message(TIMEOUT))
-                .components(replace_builder_with(watchlist.render()))
-        })
+    let ui = ctx.bind(true, ctx.http(), &ctx.serenity_context().shard)
         .await?;
 
-    let mut actions = handle
-        .message()
-        .await?
-        .await_component_interactions(&ctx.serenity_context().shard)
-        .build();
-
-    let res = loop {
-        let sleep = tokio::time::sleep(TIMEOUT);
-        tokio::pin!(sleep);
-
-        let action = tokio::select! {
-            Some(action) = actions.next() => action,
-            _ = sleep => break None,
-        };
-
-        action.defer(ctx).await?;
-
-        let command = match action.data.custom_id.parse::<ComponentAction>() {
-            Ok(command) => command,
-            Err(err) => {
-                log::warn!("An error ocurred parsing a component command: {err}");
-                continue;
-            }
-        };
-
-        if let ComponentStatus::Complete(watchlist) = watchlist.execute(command) {
-            break Some(watchlist);
-        }
-
-        handle
-            .edit(ctx, |msg| {
-                msg.content(generate::timeout_message(TIMEOUT))
-                    .components(replace_builder_with(watchlist.render()))
-            })
-            .await?;
+    let timeout = Timeout {
+        duration: Duration::from_secs(2 * 60),
+        kind: TimeoutKind::Refresh,
     };
 
-    actions.stop();
+    let config = UiConfig {
+        timeout: Some(timeout),
+    };
 
-    // clear the components
-    handle
-        .edit(ctx, |msg| {
-            msg.content("Processing...")
-                .components(|components| components.set_action_rows(vec![]))
-        })
+    let watchlist = ui.mount(watchlist, config)
         .await?;
 
-    let Some(watchlist) = res else {
-        handle.edit(ctx, |msg| {
-            msg.content("Interaction timed out, try again...")
-        }).await?;
-
-        return Ok(());
-    };
-
-    if let Err(err) = update_watchlist(&ctx.data().pool, ctx.author().id, watchlist).await {
+    if let Err(err) = update_watchlist(&ctx.data().pool, ctx.author().id, &watchlist).await {
         log::error!("An error ocurred trying to update watchlist: {err}");
-        handle
+        ui.handle
+            .reply
             .edit(ctx, |msg| msg.content("A database error ocurred."))
             .await?;
 
         return Ok(());
     }
-
-    handle
-        .edit(ctx, |msg| msg.content("Watchlist updated."))
-        .await?;
 
     Ok(())
 }
@@ -269,27 +218,20 @@ const ESCALATOR_BUTTON_ID_PREFIX: &str = "ALERTS-ESCALATOR-";
 const SUBMIT_BUTTON_ID: &str = "ALERTS-SUBMIT";
 const SUBMIT_BUTTON_EMOJI: char = '💾';
 
-enum ComponentStatus<T> {
-    Continue,
-    Complete(T),
-}
-
 enum ComponentAction {
     Toggle(EscalatorFloors),
     Submit,
 }
 
-impl WatchlistComponent {
-    fn render(&self) -> serenity::CreateComponents {
-        let mut action_rows = self
-            .watchlist
-            .iter()
-            .chunks(4)
-            .into_iter()
-            .map(|row| {
-                let mut action_row = serenity::CreateActionRow::default();
+impl Component for WatchlistComponent {
+    type Action = ComponentAction;
+    type ActionErr = anyhow::Error;
+    type Output = Watchlist;
 
-                for (&floors, &sub) in row {
+    fn render(&self, view: &mut ui::ViewBuilder) {
+        for (i, chunk) in self.watchlist.iter().chunks(4).into_iter().enumerate() {
+            view.buttons(|buttons| {
+                for (&floors, &sub) in chunk {
                     let id = format!("{ESCALATOR_BUTTON_ID_PREFIX}{floors}");
 
                     let style = match sub {
@@ -297,40 +239,44 @@ impl WatchlistComponent {
                         Subscription::Ignore => serenity::ButtonStyle::Secondary,
                     };
 
-                    action_row
-                        .create_button(|button| button.label(floors).custom_id(id).style(style));
+                    buttons.button(|button| button.label(floors).custom_id(id).style(style));
                 }
 
-                action_row
-            })
-            .collect_vec();
+                if i + 1 == self.watchlist.len() {
+                    buttons.button(|button| {
+                        button
+                            .label("Save List")
+                            .custom_id(SUBMIT_BUTTON_ID)
+                            .style(serenity::ButtonStyle::Success)
+                            .emoji(SUBMIT_BUTTON_EMOJI)
+                    });
+                }
 
-        action_rows.last_mut().unwrap().create_button(|button| {
-            button
-                .label("Save List")
-                .custom_id(SUBMIT_BUTTON_ID)
-                .style(serenity::ButtonStyle::Success)
-                .emoji(SUBMIT_BUTTON_EMOJI)
-        });
-
-        let mut components = serenity::CreateComponents::default();
-
-        components.set_action_rows(action_rows);
-
-        components
+                buttons
+            });
+        }
     }
 
-    fn execute(&mut self, command: ComponentAction) -> ComponentStatus<&Watchlist> {
-        match command {
-            ComponentAction::Submit => ComponentStatus::Complete(&self.watchlist),
-            ComponentAction::Toggle(floors) => {
-                if let Some(sub) = self.watchlist.get_mut(&floors) {
-                    sub.toggle();
-                }
+    fn render_output(_output: &Self::Output, view: &mut ui::ViewBuilder) {
+        view.add_content("Updated watchlist.");
+    }
 
-                ComponentStatus::Continue
+    fn update(&mut self, action: Self::Action) -> Option<ui::Update> {
+        match action {
+            ComponentAction::Submit => Some(ui::Update::Halt),
+            ComponentAction::Toggle(floors) => {
+                self.watchlist
+                    .get_mut(&floors)
+                    .map(|sub| {
+                        sub.toggle();
+                        ui::Update::Render
+                    })
             }
         }
+    }
+
+    fn conclude(self) -> Option<Self::Output> {
+        Some(self.watchlist)
     }
 }
 
