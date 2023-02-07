@@ -247,7 +247,7 @@ impl Component for WatchlistComponent {
                     buttons.button(|button| button.label(floors).custom_id(id).style(style));
                 }
 
-                if i + 1 == self.watchlist.len() {
+                if i == (self.watchlist.len() - 1) / 4 {
                     buttons.button(|button| {
                         button
                             .label("Save List")
