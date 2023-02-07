@@ -5,10 +5,10 @@ pub mod view;
 pub use self::{
     message::{MessageHandle, MessageInterface},
     timeout::{Timeout, TimeoutKind},
-    view::ViewBuilder,
+    view::{View, ViewBuilder},
 };
 
-use self::{timeout::TimeoutSleeper, view::View};
+use self::{timeout::TimeoutSleeper};
 
 use futures::{Future, FutureExt};
 use poise::async_trait;

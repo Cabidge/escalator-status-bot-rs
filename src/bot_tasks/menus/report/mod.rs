@@ -6,7 +6,7 @@ use crate::{
     generate::REPORT_BUTTON_ID,
     prelude::*,
     ui::{
-        MessageHandle, Timeout, TimeoutKind, UiConfig, UserInterface, ViewBuilder, message::{message_interaction::ToInteractionHandle},
+        MessageHandle, Timeout, TimeoutKind, UiConfig, UserInterface, message::{message_interaction::ToInteractionHandle}, View,
     },
     ComponentMessage,
 };
@@ -124,7 +124,7 @@ async fn handle_report(
     let affected_escalators = match commit_report(pool, report).await {
         Ok(e) => e,
         Err(err) => {
-            let response = ViewBuilder::with_content("A database error ocurred...").build();
+            let response = View::with_content("A database error ocurred...");
             ui.handle.show(response).await?;
 
             return Err(err.into());

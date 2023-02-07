@@ -40,10 +40,7 @@ impl ViewBuilder {
     }
 
     pub fn with_content(s: impl ToString) -> Self {
-        Self(View {
-            content: s.to_string(),
-            ..Default::default()
-        })
+        Self(View::with_content(s))
     }
 
     pub fn with_timeout(sleeper: &TimeoutSleeper) -> Self {
@@ -131,6 +128,15 @@ impl ViewBuilder {
         f(&mut row);
 
         self.add_row(row)
+    }
+}
+
+impl View {
+    pub fn with_content(s: impl ToString) -> Self {
+        View {
+            content: s.to_string(),
+            ..Default::default()
+        }
     }
 }
 

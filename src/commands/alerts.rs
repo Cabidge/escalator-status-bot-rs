@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use poise::serenity_prelude::CacheHttp;
 
-use crate::{prelude::*, ui::{Component, self, UserInterface, Timeout, TimeoutKind, UiConfig, message::poise_context::IntoPoiseContextHandle, MessageHandle, ViewBuilder}};
+use crate::{prelude::*, ui::{Component, self, UserInterface, Timeout, TimeoutKind, UiConfig, message::poise_context::IntoPoiseContextHandle, MessageHandle, View}};
 
 type Watchlist = IndexMap<EscalatorFloors, Subscription>;
 
@@ -58,7 +58,7 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
     if let Err(err) = update_watchlist(&ctx.data().pool, ctx.author().id, &watchlist).await {
         log::error!("An error ocurred trying to update watchlist: {err}");
         ui.handle
-            .show(ViewBuilder::with_content("A database error ocurred.").build())
+            .show(View::with_content("A database error ocurred."))
             .await?;
 
         return Ok(());

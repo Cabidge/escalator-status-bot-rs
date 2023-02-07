@@ -4,7 +4,7 @@ pub mod poise_context;
 use crate::prelude::*;
 
 use super::{
-    view::View, Component, CustomError, Signal, UiConfig, UiError, UiResult, Update, UserInterface,
+    View, Component, CustomError, Signal, UiConfig, UiError, UiResult, Update, UserInterface,
     ViewBuilder,
 };
 
@@ -134,7 +134,7 @@ impl<'a, T: MessageHandle> UserInterface for MessageInterface<'a, T> {
         };
 
         if conclusion == Conclusion::Timeout {
-            self.show(ViewBuilder::with_content("*timed out*").build())
+            self.show(View::with_content("*timed out*"))
                 .await?;
 
             return Err(UiError::Timeout);
@@ -144,7 +144,7 @@ impl<'a, T: MessageHandle> UserInterface for MessageInterface<'a, T> {
             return Ok(output);
         };
 
-        self.show(ViewBuilder::with_content("*interaction failed to complete*").build())
+        self.show(View::with_content("*interaction failed to complete*"))
             .await?;
 
         Err(UiError::Incomplete)
