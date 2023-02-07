@@ -133,6 +133,10 @@ impl<'a, T: MessageHandle> UserInterface for MessageInterface<'a, T> {
         }
 
         if let Some(output) = component.conclude() {
+            let mut view = ViewBuilder::default();
+            C::render_output(&output, &mut view);
+            self.show(view.build()).await?;
+
             return Ok(output);
         };
 
