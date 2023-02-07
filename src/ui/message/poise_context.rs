@@ -1,7 +1,7 @@
 use crate::{prelude::*, ui::view::View};
 
-use super::MessageHandle;
-use poise::{async_trait, CreateReply, ReplyHandle};
+use super::{MessageHandle, MessageInterface};
+use poise::{async_trait, CreateReply, ReplyHandle, serenity_prelude::CacheHttp};
 
 pub enum PoiseContextHandle<'a, const EPHEMERAL: bool> {
     Deferred {
@@ -13,13 +13,18 @@ pub enum PoiseContextHandle<'a, const EPHEMERAL: bool> {
     },
 }
 
-pub trait IntoPoiseContextHandle<'a> {
-    fn into_handle<const EPHEMERAL: bool>(self) -> PoiseContextHandle<'a, EPHEMERAL>;
+pub trait PoiseContextHandleExt<'a> {
+    fn as_handle<const EPHEMERAL: bool>(&'a self) -> PoiseContextHandle<'a, EPHEMERAL>;
+    fn as_ui<const EPHEMERAL: bool>(&'a self) -> MessageInterface<'a, PoiseContextHandle<'a, EPHEMERAL>>;
 }
 
-impl<'a> IntoPoiseContextHandle<'a> for Context<'a> {
-    fn into_handle<const EPHEMERAL: bool>(self) -> PoiseContextHandle<'a, EPHEMERAL> {
-        PoiseContextHandle::Deferred { ctx: self }
+impl<'a> PoiseContextHandleExt<'a> for Context<'a> {
+    fn as_handle<const EPHEMERAL: bool>(&'a self) -> PoiseContextHandle<'a, EPHEMERAL> {
+        PoiseContextHandle::Deferred { ctx: *self }
+    }
+
+    fn as_ui<const EPHEMERAL: bool>(&'a self) -> MessageInterface<'a, PoiseContextHandle<'a, EPHEMERAL>> {
+        self.as_handle().into_ui(self.http(), &self.serenity_context().shard)
     }
 }
 

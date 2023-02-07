@@ -3,12 +3,11 @@ use std::{str::FromStr, time::Duration};
 use futures::TryStreamExt;
 use indexmap::IndexMap;
 use itertools::Itertools;
-use poise::serenity_prelude::CacheHttp;
 
 use crate::{
     prelude::*,
     ui::{
-        self, message::poise_context::IntoPoiseContextHandle, Component, MessageHandle, Timeout,
+        self, message::poise_context::PoiseContextHandleExt, Component, MessageHandle, Timeout,
         TimeoutKind, UiConfig, UserInterface, View,
     },
 };
@@ -47,9 +46,7 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
 
     let watchlist = WatchlistComponent { watchlist };
 
-    let mut ui = ctx
-        .into_handle::<true>()
-        .into_ui(ctx.http(), &ctx.serenity_context().shard);
+    let mut ui = ctx.as_ui::<true>();
 
     let timeout = Timeout {
         duration: Duration::from_secs(2 * 60),
