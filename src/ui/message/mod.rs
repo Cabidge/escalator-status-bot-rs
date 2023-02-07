@@ -23,35 +23,24 @@ pub struct MessageInterface<'a, H> {
 }
 
 #[async_trait]
-pub trait MessageContext: Sized + Send {
-    type Handle: MessageHandle;
-
-    async fn send(
-        self,
+pub trait MessageHandle: Sized + Send + Sync {
+    async fn show(
+        &mut self,
         view: View,
-        ephemeral: bool,
-        http: &Http,
-    ) -> Result<Self::Handle, serenity::Error>;
+    ) -> Result<(), serenity::Error>;
 
-    async fn bind<'a>(
+    async fn get_message(&self) -> Option<serenity::Message>;
+
+    fn create_ui<'a>(
         self,
-        ephemeral: bool,
         http: &'a Http,
         shard: &'a ShardMessenger,
-    ) -> Result<MessageInterface<'a, Self::Handle>, serenity::Error> {
-        let handle = self
-            .send(
-                ViewBuilder::with_content("*initializing...*").build(),
-                ephemeral,
-                http,
-            )
-            .await?;
-
-        Ok(MessageInterface {
-            handle,
+    ) -> MessageInterface<'a, Self> {
+        MessageInterface {
+            handle: self,
             http,
             shard,
-        })
+        }
     }
 }
 
@@ -62,37 +51,23 @@ enum Conclusion {
 }
 
 #[async_trait]
-pub trait MessageHandle: Send + Sync {
-    async fn edit(&self, view: View, http: &Http) -> Result<(), serenity::Error>;
-    async fn message(&self, http: &Http) -> Result<serenity::Message, serenity::Error>;
-}
-
-#[async_trait]
 impl<'a, T: MessageHandle> UserInterface for MessageInterface<'a, T> {
     async fn run<C: Component>(
-        &self,
+        &mut self,
         mut component: C,
         config: UiConfig,
         mut signals: mpsc::UnboundedReceiver<Signal<C>>,
     ) -> UiResult<C> {
         let http = &self.http;
 
-        let show = |view: ViewBuilder| async {
-            self.handle
-                .edit(view.build(), http)
+        async fn show(handle: &mut impl MessageHandle, view: ViewBuilder) -> Result<(), CustomError> {
+            handle
+                .show(view.build())
                 .await
                 .map_err(CustomError::new)
-        };
+        }
 
         let mut timeout = config.sleeper();
-
-        let mut collector = self
-            .handle
-            .message(http)
-            .await
-            .map_err(CustomError::new)?
-            .await_component_interactions(self.shard)
-            .build();
 
         let mut view = if let Some(sleeper) = &mut timeout {
             ViewBuilder::with_timeout(sleeper)
@@ -102,7 +77,15 @@ impl<'a, T: MessageHandle> UserInterface for MessageInterface<'a, T> {
 
         component.render(&mut view);
 
-        show(view).await?;
+        show(&mut self.handle, view).await?;
+
+        let mut collector = self
+            .handle
+            .get_message()
+            .await
+            .ok_or_else(|| CustomError(anyhow::anyhow!("Message not found...")))?
+            .await_component_interactions(self.shard)
+            .build();
 
         let conclusion = loop {
             let wait_for_timeout = async {
@@ -155,24 +138,25 @@ impl<'a, T: MessageHandle> UserInterface for MessageInterface<'a, T> {
 
                     component.render(&mut view);
 
-                    show(view).await?;
+                    show(&mut self.handle, view).await?;
                 }
             }
         };
 
         if conclusion == Conclusion::Timeout {
-            self.handle
-                .edit(ViewBuilder::with_content("*timed out*").build(), http)
-                .await
-                .map_err(CustomError::new)?;
+            show(&mut self.handle, ViewBuilder::with_content("*timed out*"))
+                .await?;
+
             return Err(UiError::Timeout);
         }
 
-        let Some(output) = component.conclude() else {
-            self.handle.edit(ViewBuilder::with_content("*interaction failed to complete*").build(), http).await.map_err(CustomError::new)?;
-            return Err(UiError::Incomplete);
+        if let Some(output) = component.conclude() {
+            return Ok(output);
         };
 
-        Ok(output)
+        show(&mut self.handle, ViewBuilder::with_content("*interaction failed to complete*"))
+            .await?;
+
+        Err(UiError::Incomplete)
     }
 }

@@ -5,44 +5,57 @@ use poise::{
 
 use crate::{prelude::*, ui::view::View};
 
-use super::{MessageContext, MessageHandle};
+use super::MessageHandle;
 
-#[async_trait]
-impl MessageContext for MessageComponentInteraction {
-    type Handle = Self;
+pub struct InteractionHandle<'a, const EPHEMERAL: bool> {
+    pub interaction: &'a MessageComponentInteraction,
+    http: &'a Http,
+    sent: bool,
+}
 
-    async fn send(
-        self,
-        view: View,
-        ephemeral: bool,
-        http: &Http,
-    ) -> Result<Self::Handle, serenity::Error> {
-        self.create_interaction_response(http, |res| {
-            res.interaction_response_data(|data| {
-                data.content(view.content)
-                    .set_components(view.rows.into())
-                    .ephemeral(ephemeral)
-            })
-        })
-        .await?;
+pub trait InteractionHandleExt {
+    fn create_handle<'a, const EPHEMERAL: bool>(&'a self, http: &'a Http) -> InteractionHandle<'a, EPHEMERAL>;
+}
 
-        Ok(self)
+impl InteractionHandleExt for MessageComponentInteraction {
+    fn create_handle<'a, const EPHEMERAL: bool>(&'a self, http: &'a Http) -> InteractionHandle<'a, EPHEMERAL> {
+        InteractionHandle {
+            interaction: self,
+            http,
+            sent: false,
+        }
     }
 }
 
 #[async_trait]
-impl MessageHandle for MessageComponentInteraction {
-    async fn edit(&self, view: View, http: &Http) -> Result<(), serenity::Error> {
-        self.edit_original_interaction_response(http, |res| {
-            res.content(view.content)
-                .components(replace_builder_with(view.rows.into()))
-        })
-        .await?;
+impl<'a, const EPHEMERAL: bool> MessageHandle for InteractionHandle<'a, EPHEMERAL> {
+    async fn show(
+        &mut self,
+        view: View,
+    ) -> Result<(), serenity::Error> {
+        if self.sent {
+            self.interaction.edit_original_interaction_response(self.http, |res| {
+                res.content(view.content)
+                    .components(replace_builder_with(view.rows.into()))
+            })
+            .await?;
+        } else {
+            self.interaction.create_interaction_response(self.http, |res| {
+                res.interaction_response_data(|data| {
+                    data.content(view.content)
+                        .set_components(view.rows.into())
+                        .ephemeral(EPHEMERAL)
+                })
+            })
+            .await?;
+
+            self.sent = true;
+        }
 
         Ok(())
     }
 
-    async fn message(&self, http: &Http) -> Result<serenity::Message, serenity::Error> {
-        self.get_interaction_response(http).await
+    async fn get_message(&self) -> Option<serenity::Message> {
+        self.interaction.get_interaction_response(self.http).await.ok()
     }
 }

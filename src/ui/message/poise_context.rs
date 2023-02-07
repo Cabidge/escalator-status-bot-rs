@@ -1,41 +1,63 @@
 use crate::{prelude::*, ui::view::View};
 
-use super::{MessageContext, MessageHandle};
-use poise::{async_trait, serenity_prelude::Http, CreateReply, ReplyHandle};
+use super::MessageHandle;
+use poise::{async_trait, CreateReply, ReplyHandle};
 
-pub struct PoiseContextHandle<'a> {
-    pub ctx: Context<'a>,
-    pub reply: ReplyHandle<'a>,
+pub enum PoiseContextHandle<'a, const EPHEMERAL: bool> {
+    Deferred {
+        ctx: Context<'a>,
+    },
+    Sent {
+        ctx: Context<'a>,
+        reply: ReplyHandle<'a>,
+    }
+}
+
+pub trait PoiseContextHandleExt<'a> {
+    fn create_handle<const EPHEMERAL: bool>(self) -> PoiseContextHandle<'a, EPHEMERAL>;
+}
+
+impl<'a> PoiseContextHandleExt<'a> for Context<'a> {
+    fn create_handle<const EPHEMERAL: bool>(self) -> PoiseContextHandle<'a, EPHEMERAL> {
+        PoiseContextHandle::Deferred {
+            ctx: self,
+        }
+    }
 }
 
 #[async_trait]
-impl<'a> MessageContext for Context<'a> {
-    type Handle = PoiseContextHandle<'a>;
-
-    async fn send(
-        self,
+impl<'a, const EPHEMERAL: bool> MessageHandle for PoiseContextHandle<'a, EPHEMERAL> {
+    async fn show(
+        &mut self,
         view: View,
-        ephemeral: bool,
-        _http: &Http,
-    ) -> Result<Self::Handle, serenity::Error> {
-        let reply = self
-            .send(|reply| create_view_reply(reply, view).ephemeral(ephemeral))
-            .await?;
+    ) -> Result<(), serenity::Error> {
+        match self {
+            &mut Self::Deferred { ctx } => {
+                let reply = ctx
+                    .send(|reply| create_view_reply(reply, view).ephemeral(EPHEMERAL))
+                    .await?;
 
-        Ok(PoiseContextHandle { ctx: self, reply })
+                *self = Self::Sent {
+                    ctx,
+                    reply,
+                }
+            }
+            Self::Sent { ctx, reply } => {
+                reply.edit(*ctx, |reply| create_view_reply(reply, view))
+                    .await?;
+            }
+        }
+
+        Ok(())
     }
-}
 
-#[async_trait]
-impl<'a> MessageHandle for PoiseContextHandle<'a> {
-    async fn edit(&self, view: View, _http: &Http) -> Result<(), serenity::Error> {
-        self.reply
-            .edit(self.ctx, |reply| create_view_reply(reply, view))
-            .await
-    }
-
-    async fn message(&self, _http: &Http) -> Result<serenity::Message, serenity::Error> {
-        self.reply.message().await.map(|msg| msg.into_owned())
+    async fn get_message(&self) -> Option<serenity::Message> {
+        match self {
+            Self::Deferred { .. } => None,
+            Self::Sent { reply, .. } => {
+                reply.message().await.map(|msg| msg.into_owned()).ok()
+            }
+        }
     }
 }
 

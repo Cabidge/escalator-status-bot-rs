@@ -6,7 +6,7 @@ use crate::{
     generate::REPORT_BUTTON_ID,
     prelude::*,
     ui::{
-        MessageContext, MessageHandle, Timeout, TimeoutKind, UiConfig, UserInterface, ViewBuilder,
+        MessageHandle, Timeout, TimeoutKind, UiConfig, UserInterface, ViewBuilder, message::{message_interaction::InteractionHandleExt},
     },
     ComponentMessage,
 };
@@ -114,11 +114,10 @@ async fn handle_report(
         timeout: Some(timeout),
     };
 
-    let ui = event
+    let mut ui = event
         .interaction
-        .to_owned()
-        .bind(true, &http, &event.shard)
-        .await?;
+        .create_handle::<true>(&http)
+        .create_ui(&http, &event.shard);
 
     let report = ui.mount(report, config).await?;
 
@@ -126,7 +125,7 @@ async fn handle_report(
         Ok(e) => e,
         Err(err) => {
             let response = ViewBuilder::with_content("A database error ocurred...").build();
-            ui.handle.edit(response, ui.http).await?;
+            ui.handle.show(response).await?;
 
             return Err(err.into());
         }

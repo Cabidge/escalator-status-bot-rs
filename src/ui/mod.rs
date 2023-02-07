@@ -3,7 +3,7 @@ pub mod timeout;
 pub mod view;
 
 pub use self::{
-    message::{MessageContext, MessageHandle, MessageInterface},
+    message::{MessageHandle, MessageInterface},
     timeout::{Timeout, TimeoutKind},
     view::ViewBuilder,
 };
@@ -42,13 +42,13 @@ pub trait Component: Sized + Send + Sync + 'static {
 #[async_trait]
 pub trait UserInterface: Sized {
     async fn run<C: Component>(
-        &self,
+        &mut self,
         component: C,
         config: UiConfig,
         signals: Receiver<Signal<C>>,
     ) -> UiResult<C>;
 
-    fn mount<C: Component>(&self, component: C, config: UiConfig) -> UiHandle<C> {
+    fn mount<C: Component>(&mut self, component: C, config: UiConfig) -> UiHandle<C> {
         let (emitter, signals) = tokio::sync::mpsc::unbounded_channel();
         UiHandle {
             emitter,
