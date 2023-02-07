@@ -2,12 +2,13 @@ pub mod message;
 pub mod timeout;
 pub mod view;
 
-use self::timeout::TimeoutSleeper;
 pub use self::{
     message::{MessageContext, MessageHandle, MessageInterface},
     timeout::{Timeout, TimeoutKind},
     view::ViewBuilder,
 };
+
+use self::timeout::TimeoutSleeper;
 
 use futures::{Future, FutureExt};
 use poise::async_trait;
