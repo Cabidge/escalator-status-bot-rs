@@ -8,7 +8,7 @@ pub use self::{
     view::ViewBuilder,
 };
 
-use self::timeout::TimeoutSleeper;
+use self::{timeout::TimeoutSleeper, view::View};
 
 use futures::{Future, FutureExt};
 use poise::async_trait;
@@ -47,6 +47,8 @@ pub trait UserInterface: Sized {
         config: UiConfig,
         signals: Receiver<Signal<C>>,
     ) -> UiResult<C>;
+
+    async fn show(&mut self, view: View) -> Result<(), UiError>;
 
     fn mount<C: Component>(&mut self, component: C, config: UiConfig) -> UiHandle<C> {
         let (emitter, signals) = tokio::sync::mpsc::unbounded_channel();

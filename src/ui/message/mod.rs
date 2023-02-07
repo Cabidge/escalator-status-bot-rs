@@ -8,7 +8,7 @@ use super::{
     ViewBuilder,
 };
 
-use futures::StreamExt;
+use futures::{StreamExt, TryFutureExt};
 use poise::{
     async_trait,
     serenity_prelude::{Http, ShardMessenger},
@@ -58,15 +58,6 @@ impl<'a, T: MessageHandle> UserInterface for MessageInterface<'a, T> {
         config: UiConfig,
         mut signals: mpsc::UnboundedReceiver<Signal<C>>,
     ) -> UiResult<C> {
-        let http = &self.http;
-
-        async fn show(handle: &mut impl MessageHandle, view: ViewBuilder) -> Result<(), CustomError> {
-            handle
-                .show(view.build())
-                .await
-                .map_err(CustomError::new)
-        }
-
         let mut timeout = config.sleeper();
 
         let mut view = if let Some(sleeper) = &mut timeout {
@@ -77,7 +68,7 @@ impl<'a, T: MessageHandle> UserInterface for MessageInterface<'a, T> {
 
         component.render(&mut view);
 
-        show(&mut self.handle, view).await?;
+        self.show(view.build()).await?;
 
         let mut collector = self
             .handle
@@ -103,7 +94,7 @@ impl<'a, T: MessageHandle> UserInterface for MessageInterface<'a, T> {
                         break Conclusion::Halt;
                     };
 
-                    interaction.defer(&http).await.map_err(CustomError::new)?;
+                    interaction.defer(self.http).await.map_err(CustomError::new)?;
 
                     let Ok(action) = interaction.data.custom_id.parse::<C::Action>()  else {
                         log::warn!("An error ocurred parsing a component command");
@@ -138,13 +129,13 @@ impl<'a, T: MessageHandle> UserInterface for MessageInterface<'a, T> {
 
                     component.render(&mut view);
 
-                    show(&mut self.handle, view).await?;
+                    self.show(view.build()).await?;
                 }
             }
         };
 
         if conclusion == Conclusion::Timeout {
-            show(&mut self.handle, ViewBuilder::with_content("*timed out*"))
+            self.show(ViewBuilder::with_content("*timed out*").build())
                 .await?;
 
             return Err(UiError::Timeout);
@@ -154,9 +145,14 @@ impl<'a, T: MessageHandle> UserInterface for MessageInterface<'a, T> {
             return Ok(output);
         };
 
-        show(&mut self.handle, ViewBuilder::with_content("*interaction failed to complete*"))
+        self.show(ViewBuilder::with_content("*interaction failed to complete*").build())
             .await?;
 
         Err(UiError::Incomplete)
+    }
+
+    async fn show(&mut self, view: View) -> Result<(), UiError> {
+        self.handle.show(view).map_err(CustomError::new).await?;
+        Ok(())
     }
 }
