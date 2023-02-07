@@ -8,7 +8,7 @@ pub use self::{
     view::{View, ViewBuilder},
 };
 
-use self::{timeout::TimeoutSleeper};
+use self::timeout::TimeoutSleeper;
 
 use futures::{Future, FutureExt};
 use poise::async_trait;

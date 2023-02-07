@@ -4,7 +4,7 @@ pub mod poise_context;
 use crate::prelude::*;
 
 use super::{
-    View, Component, CustomError, Signal, UiConfig, UiError, UiResult, Update, UserInterface,
+    Component, CustomError, Signal, UiConfig, UiError, UiResult, Update, UserInterface, View,
     ViewBuilder,
 };
 
@@ -24,18 +24,11 @@ pub struct MessageInterface<'a, H> {
 
 #[async_trait]
 pub trait MessageHandle: Sized + Send + Sync {
-    async fn show(
-        &mut self,
-        view: View,
-    ) -> Result<(), serenity::Error>;
+    async fn show(&mut self, view: View) -> Result<(), serenity::Error>;
 
     async fn get_message(&self) -> Option<serenity::Message>;
 
-    fn into_ui<'a>(
-        self,
-        http: &'a Http,
-        shard: &'a ShardMessenger,
-    ) -> MessageInterface<'a, Self> {
+    fn into_ui<'a>(self, http: &'a Http, shard: &'a ShardMessenger) -> MessageInterface<'a, Self> {
         MessageInterface {
             handle: self,
             http,
@@ -134,8 +127,7 @@ impl<'a, T: MessageHandle> UserInterface for MessageInterface<'a, T> {
         };
 
         if conclusion == Conclusion::Timeout {
-            self.show(View::with_content("*timed out*"))
-                .await?;
+            self.show(View::with_content("*timed out*")).await?;
 
             return Err(UiError::Timeout);
         }

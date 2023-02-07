@@ -6,7 +6,8 @@ use crate::{
     generate::REPORT_BUTTON_ID,
     prelude::*,
     ui::{
-        MessageHandle, Timeout, TimeoutKind, UiConfig, UserInterface, message::{message_interaction::ToInteractionHandle}, View,
+        message::message_interaction::ToInteractionHandle, MessageHandle, Timeout, TimeoutKind,
+        UiConfig, UserInterface, View,
     },
     ComponentMessage,
 };

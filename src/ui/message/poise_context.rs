@@ -10,7 +10,7 @@ pub enum PoiseContextHandle<'a, const EPHEMERAL: bool> {
     Sent {
         ctx: Context<'a>,
         reply: ReplyHandle<'a>,
-    }
+    },
 }
 
 pub trait IntoPoiseContextHandle<'a> {
@@ -19,31 +19,24 @@ pub trait IntoPoiseContextHandle<'a> {
 
 impl<'a> IntoPoiseContextHandle<'a> for Context<'a> {
     fn into_handle<const EPHEMERAL: bool>(self) -> PoiseContextHandle<'a, EPHEMERAL> {
-        PoiseContextHandle::Deferred {
-            ctx: self,
-        }
+        PoiseContextHandle::Deferred { ctx: self }
     }
 }
 
 #[async_trait]
 impl<'a, const EPHEMERAL: bool> MessageHandle for PoiseContextHandle<'a, EPHEMERAL> {
-    async fn show(
-        &mut self,
-        view: View,
-    ) -> Result<(), serenity::Error> {
+    async fn show(&mut self, view: View) -> Result<(), serenity::Error> {
         match self {
             &mut Self::Deferred { ctx } => {
                 let reply = ctx
                     .send(|reply| create_view_reply(reply, view).ephemeral(EPHEMERAL))
                     .await?;
 
-                *self = Self::Sent {
-                    ctx,
-                    reply,
-                }
+                *self = Self::Sent { ctx, reply }
             }
             Self::Sent { ctx, reply } => {
-                reply.edit(*ctx, |reply| create_view_reply(reply, view))
+                reply
+                    .edit(*ctx, |reply| create_view_reply(reply, view))
                     .await?;
             }
         }
@@ -54,9 +47,7 @@ impl<'a, const EPHEMERAL: bool> MessageHandle for PoiseContextHandle<'a, EPHEMER
     async fn get_message(&self) -> Option<serenity::Message> {
         match self {
             Self::Deferred { .. } => None,
-            Self::Sent { reply, .. } => {
-                reply.message().await.map(|msg| msg.into_owned()).ok()
-            }
+            Self::Sent { reply, .. } => reply.message().await.map(|msg| msg.into_owned()).ok(),
         }
     }
 }
