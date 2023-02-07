@@ -6,7 +6,7 @@ use crate::{
     generate::REPORT_BUTTON_ID,
     prelude::*,
     ui::{
-        MessageHandle, Timeout, TimeoutKind, UiConfig, UserInterface, ViewBuilder, message::{message_interaction::InteractionHandleExt},
+        MessageHandle, Timeout, TimeoutKind, UiConfig, UserInterface, ViewBuilder, message::{message_interaction::ToInteractionHandle},
     },
     ComponentMessage,
 };
@@ -116,8 +116,8 @@ async fn handle_report(
 
     let mut ui = event
         .interaction
-        .create_handle::<true>(&http)
-        .create_ui(&http, &event.shard);
+        .to_handle::<true>(&http)
+        .into_ui(&http, &event.shard);
 
     let report = ui.mount(report, config).await?;
 

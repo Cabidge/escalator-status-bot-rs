@@ -13,12 +13,12 @@ pub enum PoiseContextHandle<'a, const EPHEMERAL: bool> {
     }
 }
 
-pub trait PoiseContextHandleExt<'a> {
-    fn create_handle<const EPHEMERAL: bool>(self) -> PoiseContextHandle<'a, EPHEMERAL>;
+pub trait IntoPoiseContextHandle<'a> {
+    fn into_handle<const EPHEMERAL: bool>(self) -> PoiseContextHandle<'a, EPHEMERAL>;
 }
 
-impl<'a> PoiseContextHandleExt<'a> for Context<'a> {
-    fn create_handle<const EPHEMERAL: bool>(self) -> PoiseContextHandle<'a, EPHEMERAL> {
+impl<'a> IntoPoiseContextHandle<'a> for Context<'a> {
+    fn into_handle<const EPHEMERAL: bool>(self) -> PoiseContextHandle<'a, EPHEMERAL> {
         PoiseContextHandle::Deferred {
             ctx: self,
         }

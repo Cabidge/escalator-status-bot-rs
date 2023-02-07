@@ -31,7 +31,7 @@ pub trait MessageHandle: Sized + Send + Sync {
 
     async fn get_message(&self) -> Option<serenity::Message>;
 
-    fn create_ui<'a>(
+    fn into_ui<'a>(
         self,
         http: &'a Http,
         shard: &'a ShardMessenger,

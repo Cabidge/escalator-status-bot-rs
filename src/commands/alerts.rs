@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use poise::serenity_prelude::CacheHttp;
 
-use crate::{prelude::*, ui::{Component, self, UserInterface, Timeout, TimeoutKind, UiConfig, message::poise_context::PoiseContextHandleExt, MessageHandle, ViewBuilder}};
+use crate::{prelude::*, ui::{Component, self, UserInterface, Timeout, TimeoutKind, UiConfig, message::poise_context::IntoPoiseContextHandle, MessageHandle, ViewBuilder}};
 
 type Watchlist = IndexMap<EscalatorFloors, Subscription>;
 
@@ -41,7 +41,7 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
 
     let watchlist = WatchlistComponent { watchlist };
 
-    let mut ui = ctx.create_handle::<true>().create_ui(ctx.http(), &ctx.serenity_context().shard);
+    let mut ui = ctx.into_handle::<true>().into_ui(ctx.http(), &ctx.serenity_context().shard);
 
     let timeout = Timeout {
         duration: Duration::from_secs(2 * 60),

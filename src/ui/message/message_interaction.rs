@@ -13,12 +13,12 @@ pub struct InteractionHandle<'a, const EPHEMERAL: bool> {
     sent: bool,
 }
 
-pub trait InteractionHandleExt {
-    fn create_handle<'a, const EPHEMERAL: bool>(&'a self, http: &'a Http) -> InteractionHandle<'a, EPHEMERAL>;
+pub trait ToInteractionHandle {
+    fn to_handle<'a, const EPHEMERAL: bool>(&'a self, http: &'a Http) -> InteractionHandle<'a, EPHEMERAL>;
 }
 
-impl InteractionHandleExt for MessageComponentInteraction {
-    fn create_handle<'a, const EPHEMERAL: bool>(&'a self, http: &'a Http) -> InteractionHandle<'a, EPHEMERAL> {
+impl ToInteractionHandle for MessageComponentInteraction {
+    fn to_handle<'a, const EPHEMERAL: bool>(&'a self, http: &'a Http) -> InteractionHandle<'a, EPHEMERAL> {
         InteractionHandle {
             interaction: self,
             http,
