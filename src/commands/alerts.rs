@@ -60,7 +60,7 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
         timeout: Some(timeout),
     };
 
-    let watchlist = ui.mount(watchlist, config).await?;
+    let Ok(watchlist) = ui.mount(watchlist, config).await else { return Ok(()) };
 
     if let Err(err) = update_watchlist(&ctx.data().pool, ctx.author().id, &watchlist).await {
         log::error!("An error ocurred trying to update watchlist: {err}");
