@@ -80,12 +80,11 @@ impl<'a, T: MessageHandle> UserInterface for MessageInterface<'a, T> {
 
         let conclusion = loop {
             let wait_for_timeout = async {
-                let Some(sleeper) = &mut timeout else {
+                if let Some(sleeper) = &mut timeout {
+                    sleeper.await;
+                } else {
                     future::pending::<()>().await;
-                    unreachable!()
-                };
-
-                sleeper.await;
+                }
             };
 
             let signal = tokio::select! {
