@@ -7,6 +7,7 @@ mod commands;
 mod migration;
 mod prelude;
 
+use axum::Router;
 use bot_tasks::{
     alert::AlertTask,
     announce::AnnounceTask,
@@ -17,6 +18,7 @@ use futures::future::BoxFuture;
 use poise::serenity_prelude::{MessageComponentInteraction, ShardMessenger};
 use shuttle_service::error::CustomError;
 use std::{process::Termination, sync::Arc};
+use sync_wrapper::SyncWrapper;
 use tokio::task;
 
 use prelude::*;
@@ -24,6 +26,7 @@ use prelude::*;
 struct EscalatorBot {
     framework: Arc<poise::Framework<Data, Error>>,
     tasks: Vec<task::JoinHandle<()>>,
+    router: SyncWrapper<Router>,
 }
 
 #[shuttle_service::main]
@@ -83,6 +86,7 @@ impl EscalatorBot {
         Self {
             framework,
             tasks: vec![],
+            router: SyncWrapper::new(Router::new()),
         }
     }
 
@@ -114,9 +118,15 @@ impl EscalatorBot {
 impl shuttle_service::Service for EscalatorBot {
     async fn bind(
         mut self: Box<Self>,
-        _addr: std::net::SocketAddr,
+        addr: std::net::SocketAddr,
     ) -> Result<(), shuttle_service::error::Error> {
-        self.framework.start().await.map_err(anyhow::Error::from)?;
+        let router = self.router.into_inner();
+        let serve_router = axum::Server::bind(&addr).serve(router.into_make_service());
+
+        tokio::select! {
+            res = self.framework.start() => res.map_err(CustomError::new)?,
+            _ = serve_router => ()
+        }
 
         // abort all bot tasks once client stops
         for task in self.tasks {
