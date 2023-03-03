@@ -33,6 +33,8 @@ async fn init(
     #[shuttle_secrets::Secrets] secret_store: shuttle_secrets::SecretStore,
     #[shuttle_shared_db::Postgres] pool: sqlx::PgPool,
 ) -> Result<EscalatorBot, shuttle_service::Error> {
+    log::info!("running init function...");
+
     // try to get token, errors if token isn't found
     let Some(token) = secret_store.get("TOKEN") else {
         return Err(anyhow::anyhow!("Discord token not found...").into());
