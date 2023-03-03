@@ -4,7 +4,6 @@ pub mod ui;
 
 mod bot_tasks;
 mod commands;
-mod migration;
 mod prelude;
 
 use axum::Router;
@@ -32,7 +31,6 @@ struct EscalatorBot {
 #[shuttle_service::main]
 async fn init(
     #[shuttle_secrets::Secrets] secret_store: shuttle_secrets::SecretStore,
-    #[shuttle_persist::Persist] persist: shuttle_persist::PersistInstance,
     #[shuttle_shared_db::Postgres] pool: sqlx::PgPool,
 ) -> Result<EscalatorBot, shuttle_service::Error> {
     // try to get token, errors if token isn't found
@@ -55,14 +53,12 @@ async fn init(
         })
         .token(token)
         .intents(serenity::GatewayIntents::non_privileged())
-        .setup(move |ctx, _ready, framework| {
+        .setup(move |_ctx, _ready, framework| {
             Box::pin(async move {
                 // set up bot data
                 log::info!("Bot is ready");
 
                 let shard_manager = Arc::clone(framework.shard_manager());
-
-                migration::migrate_to_sqlx(&persist, &pool, ctx).await;
 
                 Ok(Data::new(shard_manager, pool))
             })
@@ -124,8 +120,13 @@ impl shuttle_service::Service for EscalatorBot {
         let serve_router = axum::Server::bind(&addr).serve(router.into_make_service());
 
         tokio::select! {
-            res = self.framework.start() => res.map_err(CustomError::new)?,
-            _ = serve_router => ()
+            res = self.framework.start() => {
+                res.map_err(CustomError::new)?;
+                log::info!("bot closing...");
+            }
+            _ = serve_router => {
+                log::info!("router closing...");
+            }
         }
 
         // abort all bot tasks once client stops
