@@ -241,7 +241,7 @@ async fn commit_report(
                 let floors = EscalatorFloors::new(start, end);
                 let escalator = Escalator { floors, status };
 
-                if report_escalator(&mut transaction, escalator).await? {
+                if report_escalator(&mut *transaction, escalator).await? {
                     escalators.push(floors);
                 }
             }

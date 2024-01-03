@@ -27,7 +27,7 @@ async fn init(ctx: Context<'_>) -> Result<(), Error> {
         ",
     )
     .bind(guild_id.0 as i64)
-    .fetch_optional(&mut transaction)
+    .fetch_optional(&mut *transaction)
     .await?
     .is_some();
 
@@ -59,7 +59,7 @@ async fn init(ctx: Context<'_>) -> Result<(), Error> {
     .bind(guild_id.0 as i64)
     .bind(channel_id.0 as i64)
     .bind(message_id.0 as i64)
-    .execute(&mut transaction)
+    .execute(&mut *transaction)
     .await?;
 
     transaction.commit().await?;

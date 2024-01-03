@@ -240,7 +240,7 @@ async fn update_watchlist(
     .bind(user_id.0 as i64)
     .bind(&starts)
     .bind(&ends)
-    .execute(&mut transaction)
+    .execute(&mut *transaction)
     .await?;
 
     sqlx::query(
@@ -259,7 +259,7 @@ async fn update_watchlist(
     .bind(user_id.0 as i64)
     .bind(&starts)
     .bind(&ends)
-    .execute(&mut transaction)
+    .execute(&mut *transaction)
     .await?;
 
     transaction.commit().await

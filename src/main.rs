@@ -14,6 +14,7 @@ use bot_tasks::{
 };
 use futures::future::BoxFuture;
 use poise::serenity_prelude::{MessageComponentInteraction, ShardMessenger};
+use shuttle_runtime::async_trait;
 use shuttle_service::error::CustomError;
 use std::{process::Termination, sync::Arc};
 use tokio::task;
@@ -25,7 +26,7 @@ struct EscalatorBot {
     tasks: Vec<task::JoinHandle<()>>,
 }
 
-#[shuttle_service::main]
+#[shuttle_runtime::main]
 async fn init(
     #[shuttle_secrets::Secrets] secret_store: shuttle_secrets::SecretStore,
     #[shuttle_persist::Persist] persist: shuttle_persist::PersistInstance,
@@ -109,10 +110,10 @@ impl EscalatorBot {
     }
 }
 
-#[shuttle_service::async_trait]
-impl shuttle_service::Service for EscalatorBot {
+#[async_trait]
+impl shuttle_runtime::Service for EscalatorBot {
     async fn bind(
-        mut self: Box<Self>,
+        mut self,
         _addr: std::net::SocketAddr,
     ) -> Result<(), shuttle_service::error::Error> {
         self.framework.start().await.map_err(anyhow::Error::from)?;
