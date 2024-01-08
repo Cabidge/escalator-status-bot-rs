@@ -14,8 +14,7 @@ use bot_tasks::{
 };
 use futures::future::BoxFuture;
 use poise::serenity_prelude::{MessageComponentInteraction, ShardMessenger};
-use shuttle_runtime::async_trait;
-use shuttle_service::error::CustomError;
+use shuttle_runtime::{async_trait, CustomError};
 use std::{process::Termination, sync::Arc};
 use tokio::task;
 
@@ -31,7 +30,7 @@ async fn init(
     #[shuttle_secrets::Secrets] secret_store: shuttle_secrets::SecretStore,
     #[shuttle_persist::Persist] persist: shuttle_persist::PersistInstance,
     #[shuttle_shared_db::Postgres] pool: sqlx::PgPool,
-) -> Result<EscalatorBot, shuttle_service::Error> {
+) -> Result<EscalatorBot, shuttle_runtime::Error> {
     // try to get token, errors if token isn't found
     let Some(token) = secret_store.get("TOKEN") else {
         return Err(anyhow::anyhow!("Discord token not found...").into());
@@ -112,10 +111,7 @@ impl EscalatorBot {
 
 #[async_trait]
 impl shuttle_runtime::Service for EscalatorBot {
-    async fn bind(
-        mut self,
-        _addr: std::net::SocketAddr,
-    ) -> Result<(), shuttle_service::error::Error> {
+    async fn bind(mut self, _addr: std::net::SocketAddr) -> Result<(), shuttle_runtime::Error> {
         self.framework.start().await.map_err(anyhow::Error::from)?;
 
         // abort all bot tasks once client stops

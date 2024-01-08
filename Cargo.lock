@@ -666,7 +666,6 @@ dependencies = [
  "shuttle-persist",
  "shuttle-runtime",
  "shuttle-secrets",
- "shuttle-service",
  "shuttle-shared-db",
  "smallvec",
  "sqlx",
