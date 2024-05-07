@@ -14,7 +14,7 @@ use bot_tasks::{
 };
 use futures::future::BoxFuture;
 use poise::serenity_prelude::{MessageComponentInteraction, ShardMessenger};
-use shuttle_runtime::{async_trait, CustomError};
+use shuttle_runtime::{async_trait, CustomError, SecretStore};
 use std::{process::Termination, sync::Arc};
 use tokio::task;
 
@@ -27,7 +27,7 @@ struct EscalatorBot {
 
 #[shuttle_runtime::main]
 async fn init(
-    #[shuttle_secrets::Secrets] secret_store: shuttle_secrets::SecretStore,
+    #[shuttle_runtime::Secrets] secret_store: SecretStore,
     #[shuttle_persist::Persist] persist: shuttle_persist::PersistInstance,
     #[shuttle_shared_db::Postgres] pool: sqlx::PgPool,
 ) -> Result<EscalatorBot, shuttle_runtime::Error> {
