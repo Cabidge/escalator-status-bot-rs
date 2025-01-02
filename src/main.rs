@@ -3,7 +3,6 @@ pub mod generate;
 
 mod bot_tasks;
 mod commands;
-mod migration;
 mod prelude;
 
 use bot_tasks::{
@@ -28,7 +27,6 @@ struct EscalatorBot {
 #[shuttle_runtime::main]
 async fn init(
     #[shuttle_runtime::Secrets] secret_store: SecretStore,
-    #[shuttle_persist::Persist] persist: shuttle_persist::PersistInstance,
     #[shuttle_shared_db::Postgres] pool: sqlx::PgPool,
 ) -> Result<EscalatorBot, shuttle_runtime::Error> {
     // try to get token, errors if token isn't found
@@ -51,14 +49,12 @@ async fn init(
         })
         .token(token)
         .intents(serenity::GatewayIntents::non_privileged())
-        .setup(move |ctx, _ready, framework| {
+        .setup(move |_ctx, _ready, framework| {
             Box::pin(async move {
                 // set up bot data
                 log::info!("Bot is ready");
 
                 let shard_manager = Arc::clone(framework.shard_manager());
-
-                migration::migrate_to_sqlx(&persist, &pool, ctx).await;
 
                 Ok(Data::new(shard_manager, pool))
             })

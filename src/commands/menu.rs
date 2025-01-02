@@ -1,7 +1,5 @@
 use crate::{generate, prelude::*};
 
-use poise::serenity_prelude::CacheHttp;
-
 #[poise::command(slash_command, subcommands("init", "clear"), owners_only)]
 pub async fn menu(_ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
@@ -84,11 +82,12 @@ async fn clear(ctx: Context<'_>) -> Result<(), Error> {
         DELETE FROM menu_messages
         WHERE guild_id = $1
         RETURNING channel_id, message_id
-        "
+        ",
     )
     .bind(guild_id.0 as i64)
     .fetch_optional(&ctx.data().pool)
-    .await? else {
+    .await?
+    else {
         ctx.say("No report menu exists in this server.").await?;
         return Ok(());
     };

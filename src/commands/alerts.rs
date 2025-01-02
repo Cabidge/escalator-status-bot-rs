@@ -97,9 +97,11 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
         .await?;
 
     let Some(watchlist) = res else {
-        handle.edit(ctx, |msg| {
-            msg.content("Interaction timed out, try again...")
-        }).await?;
+        handle
+            .edit(ctx, |msg| {
+                msg.content("Interaction timed out, try again...")
+            })
+            .await?;
 
         return Ok(());
     };
@@ -161,26 +163,12 @@ async fn load_watchlist(
     pool: &sqlx::PgPool,
     user_id: serenity::UserId,
 ) -> Result<Watchlist, sqlx::Error> {
-    use sqlx::Row;
-
     #[derive(sqlx::FromRow)]
     struct WatchlistEntry {
         #[sqlx(flatten)]
         floors: EscalatorFloors,
         #[sqlx(flatten)]
         subscription: Subscription,
-    }
-
-    impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for Subscription {
-        fn from_row(row: &'r sqlx::postgres::PgRow) -> Result<Self, sqlx::Error> {
-            let sub = if row.try_get("watching")? {
-                Subscription::Watch
-            } else {
-                Subscription::Ignore
-            };
-
-            Ok(sub)
-        }
     }
 
     let mut watchlist = IndexMap::new();
@@ -347,6 +335,20 @@ impl Subscription {
             Self::Watch => true,
             Self::Ignore => false,
         }
+    }
+}
+
+impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for Subscription {
+    fn from_row(row: &'r sqlx::postgres::PgRow) -> Result<Self, sqlx::Error> {
+        use sqlx::Row;
+
+        let sub = if row.try_get("watching")? {
+            Subscription::Watch
+        } else {
+            Subscription::Ignore
+        };
+
+        Ok(sub)
     }
 }
 
