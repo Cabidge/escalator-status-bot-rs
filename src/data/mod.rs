@@ -4,22 +4,18 @@ pub mod escalator_input;
 pub mod report;
 pub mod status;
 
-use crate::prelude::*;
-
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
 #[derive(Clone)]
 pub struct Data {
-    pub shard_manager: Arc<serenity::ShardManager>,
     pub pool: sqlx::PgPool,
     channels: Arc<parking_lot::RwLock<channels::AnyChannels>>,
 }
 
 impl Data {
-    pub fn new(shard_manager: Arc<serenity::ShardManager>, pool: sqlx::PgPool) -> Self {
+    pub fn new(pool: sqlx::PgPool) -> Self {
         Self {
-            shard_manager,
             pool,
             channels: Arc::new(parking_lot::RwLock::new(channels::AnyChannels::new())),
         }

@@ -12,7 +12,9 @@ use bot_tasks::{
     BotTask,
 };
 use futures::future::BoxFuture;
-use poise::serenity_prelude::{Cache, CacheHttp, ComponentInteraction, FullEvent, Http, ShardMessenger};
+use poise::serenity_prelude::{
+    Cache, CacheHttp, ComponentInteraction, FullEvent, Http, ShardMessenger,
+};
 use shuttle_runtime::{async_trait, CustomError, SecretStore};
 use std::{process::Termination, sync::Arc};
 use tokio::task;
@@ -21,6 +23,7 @@ use prelude::*;
 
 struct EscalatorBot {
     framework: poise::Framework<Data, Error>,
+    data: Data,
     token: String,
 }
 
@@ -47,6 +50,8 @@ async fn init(
         .await
         .map_err(CustomError::new)?;
 
+    let data = Data::new(pool);
+
     // create bot framework
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -55,26 +60,27 @@ async fn init(
             event_handler,
             ..Default::default()
         })
-        .setup(move |_ctx, _ready, framework| {
-            Box::pin(async move {
-                // set up bot data
-                log::info!("Bot is ready");
-
-                let shard_manager = Arc::clone(framework.shard_manager());
-
-                Ok(Data::new(shard_manager, pool))
-            })
+        .setup({
+            let data = data.clone();
+            move |_ctx, _ready, _framework| {
+                Box::pin(async move {
+                    // set up bot data
+                    log::info!("Bot is ready");
+                    Ok(data)
+                })
+            }
         })
         .build();
 
-    let bot = EscalatorBot::new(framework, token);
+    let bot = EscalatorBot::new(framework, data, token);
     Ok(bot)
 }
 
 impl EscalatorBot {
-    fn new(framework: poise::Framework<Data, Error>, token: String) -> Self {
+    fn new(framework: poise::Framework<Data, Error>, data: Data, token: String) -> Self {
         Self {
             framework,
+            data,
             token,
         }
     }
@@ -84,7 +90,6 @@ impl EscalatorBot {
 impl shuttle_runtime::Service for EscalatorBot {
     async fn bind(mut self, _addr: std::net::SocketAddr) -> Result<(), shuttle_runtime::Error> {
         let intents = serenity::GatewayIntents::non_privileged();
-        let data = self.framework.user_data().await.clone();
 
         let mut client = serenity::ClientBuilder::new(self.token, intents)
             .framework(self.framework)
@@ -94,7 +99,7 @@ impl shuttle_runtime::Service for EscalatorBot {
         let cache = Arc::clone(&client.cache);
         let http = Arc::clone(&client.http);
         let cache_http = Arc::new(CacheAndHttp(cache, http));
-        let mut bot_tasks = BotTasks::new(data, cache_http)
+        let mut bot_tasks = BotTasks::new(self.data, cache_http)
             .start_task(AnnounceTask::default())
             .await?
             .start_task(AlertTask)
@@ -135,10 +140,7 @@ impl<T: CacheHttp> BotTasks<T> {
     }
 
     async fn start_task(mut self, task: impl BotTask<T> + 'static) -> anyhow::Result<Self> {
-        let Some(data) = task
-            .setup(&self.data, Arc::clone(&self.cache_http))
-            .await
-        else {
+        let Some(data) = task.setup(&self.data, Arc::clone(&self.cache_http)).await else {
             anyhow::bail!(
                 "Faield to run setup for bot task: {}",
                 std::any::type_name::<T>()
