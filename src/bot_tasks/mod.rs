@@ -4,14 +4,13 @@ pub mod menus;
 
 use crate::prelude::*;
 
-use poise::async_trait;
-use std::{process::Termination, sync::Weak};
+use poise::serenity_prelude::CacheHttp;
+use std::{future::Future, process::Termination, sync::Arc};
 
-#[async_trait]
-pub trait BotTask: Send + Sync {
-    type Data: Send;
+pub trait BotTask<T: CacheHttp>: Send + Sync {
+    type Data: Send + 'static;
     type Term: Termination;
 
-    async fn setup(&self, framework: Weak<poise::Framework<Data, Error>>) -> Option<Self::Data>;
-    async fn run(self, data: Self::Data) -> Self::Term;
+    async fn setup(&self, data: &Data, cache_http: Arc<T>) -> Option<Self::Data>;
+    fn run(self, data: Self::Data) -> impl Future<Output = Self::Term> + Send;
 }

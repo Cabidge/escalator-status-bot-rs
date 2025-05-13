@@ -11,17 +11,19 @@ use crate::{
 use chrono::prelude::*;
 use chrono_tz::America::New_York as NYCTimeZone;
 use futures::{StreamExt, TryStreamExt};
-use poise::async_trait;
+use poise::serenity_prelude::{
+    CacheHttp, CreateInteractionResponse, CreateInteractionResponseMessage, EditInteractionResponse,
+};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::broadcast::{self, error::RecvError};
 
 pub struct ReportTask;
 
-pub struct TaskData {
+pub struct TaskData<T> {
     pool: sqlx::PgPool,
     interactions: broadcast::Receiver<Arc<ComponentMessage>>,
     reporter: broadcast::Sender<UserReport>,
-    cache_http: Arc<serenity::CacheAndHttp>,
+    cache_http: Arc<T>,
 }
 
 #[derive(Clone, Copy)]
@@ -30,21 +32,11 @@ pub struct Report {
     status: Status,
 }
 
-#[async_trait]
-impl BotTask for ReportTask {
-    type Data = TaskData;
+impl<T: CacheHttp + 'static> BotTask<T> for ReportTask {
+    type Data = TaskData<T>;
     type Term = anyhow::Result<()>;
 
-    async fn setup(
-        &self,
-        framework: std::sync::Weak<poise::Framework<Data, Error>>,
-    ) -> Option<Self::Data> {
-        let framework = framework.upgrade()?;
-
-        let cache_http = Arc::clone(&framework.client().cache_and_http);
-
-        let data = framework.user_data().await;
-
+    async fn setup(&self, data: &Data, cache_http: Arc<T>) -> Option<Self::Data> {
         Some(TaskData {
             pool: data.pool.clone(),
             interactions: data.receiver(),
@@ -73,18 +65,24 @@ impl BotTask for ReportTask {
             let is_active_time = (7..=18).contains(&nyc_now.hour());
 
             if !(is_weekday && is_active_time) {
-                let _ = event.interaction.create_interaction_response(&data.cache_http.http, |res| {
-                    res.interaction_response_data(|data| {
-                        data.content("Reports are locked any time before 6 am, after 7 pm, and during weekends.")
-                            .ephemeral(true)
-                    })
-                }).await.ok();
+                let msg = CreateInteractionResponseMessage::new()
+                    .content(
+                        "Reports are locked any time before 6 am, after 7 pm, and during weekends.",
+                    )
+                    .ephemeral(true);
+
+                let res = CreateInteractionResponse::Message(msg);
+                let _ = event
+                    .interaction
+                    .create_response(&data.cache_http, res)
+                    .await
+                    .ok();
 
                 continue;
             }
 
             let pool = data.pool.clone();
-            let http = Arc::clone(&data.cache_http.http);
+            let http = Arc::clone(&data.cache_http);
             let reporter = data.reporter.clone();
 
             tokio::spawn(async move {
@@ -98,7 +96,7 @@ impl BotTask for ReportTask {
 
 async fn handle_report(
     pool: &sqlx::PgPool,
-    http: &serenity::Http,
+    http: &impl CacheHttp,
     event: &ComponentMessage,
     reporter: broadcast::Sender<UserReport>,
 ) -> Result<(), Error> {
@@ -106,23 +104,19 @@ async fn handle_report(
 
     let mut report = component::ReportComponent::new();
 
-    event
-        .interaction
-        .create_interaction_response(&http, |res| {
-            res.interaction_response_data(|data| {
-                data.content(generate::timeout_message(TIMEOUT))
-                    .set_components(report.render())
-                    .ephemeral(true)
-            })
-        })
-        .await?;
+    let msg = CreateInteractionResponseMessage::new()
+        .content(generate::timeout_message(TIMEOUT))
+        .components(report.render())
+        .ephemeral(true);
+    let res = CreateInteractionResponse::Message(msg);
+    event.interaction.create_response(&http, res).await?;
 
     let mut actions = event
         .interaction
-        .get_interaction_response(http)
+        .get_response(http.http())
         .await?
         .await_component_interactions(&event.shard)
-        .build();
+        .stream();
 
     let res = loop {
         let sleep = tokio::time::sleep(TIMEOUT);
@@ -147,36 +141,25 @@ async fn handle_report(
             break Some(report);
         }
 
-        let replace_components = replace_builder_with(report.render());
+        let edit = EditInteractionResponse::new()
+            .content(generate::timeout_message(TIMEOUT))
+            .components(report.render());
 
-        event
-            .interaction
-            .edit_original_interaction_response(http, |res| {
-                res.content(generate::timeout_message(TIMEOUT))
-                    .components(replace_components)
-            })
-            .await?;
+        event.interaction.edit_response(http, edit).await?;
     };
 
-    actions.stop();
+    drop(actions);
 
-    event
-        .interaction
-        .edit_original_interaction_response(http, |msg| {
-            msg.content("Processing...")
-                .components(|components| components.set_action_rows(vec![]))
-        })
-        .await?;
+    let edit = EditInteractionResponse::new()
+        .content("Processing...")
+        .components(vec![]);
+    event.interaction.edit_response(http, edit).await?;
 
     let Some(report) = res else {
         log::debug!("Interaction timed out.");
 
-        event
-            .interaction
-            .edit_original_interaction_response(http, |msg| {
-                msg.content("Interaction timed out, try again...")
-            })
-            .await?;
+        let edit = EditInteractionResponse::new().content("Interaction timed out, try again...");
+        event.interaction.edit_response(http, edit).await?;
 
         return Ok(());
     };
@@ -186,12 +169,8 @@ async fn handle_report(
         Err(err) => {
             log::error!("An error ocurred trying to update statuses: {err}");
 
-            event
-                .interaction
-                .edit_original_interaction_response(http, |msg| {
-                    msg.content("A database error ocurred.")
-                })
-                .await?;
+            let edit = EditInteractionResponse::new().content("A database error ocurred.");
+            event.interaction.edit_response(http, edit).await?;
 
             return Ok(());
         }
@@ -203,9 +182,10 @@ async fn handle_report(
         report.escalators.message_noun(),
     );
 
+    let edit = EditInteractionResponse::new().content(message);
     event
         .interaction
-        .edit_original_interaction_response(http, |msg| msg.content(message))
+        .edit_response(http, edit)
         .await?;
 
     let full_report = UserReport {

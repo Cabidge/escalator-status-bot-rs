@@ -7,20 +7,21 @@ pub mod status;
 use crate::prelude::*;
 
 use std::sync::Arc;
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::broadcast;
 
+#[derive(Clone)]
 pub struct Data {
-    pub shard_manager: Arc<Mutex<serenity::ShardManager>>,
+    pub shard_manager: Arc<serenity::ShardManager>,
     pub pool: sqlx::PgPool,
-    channels: parking_lot::RwLock<channels::AnyChannels>,
+    channels: Arc<parking_lot::RwLock<channels::AnyChannels>>,
 }
 
 impl Data {
-    pub fn new(shard_manager: Arc<Mutex<serenity::ShardManager>>, pool: sqlx::PgPool) -> Self {
+    pub fn new(shard_manager: Arc<serenity::ShardManager>, pool: sqlx::PgPool) -> Self {
         Self {
             shard_manager,
             pool,
-            channels: parking_lot::RwLock::new(channels::AnyChannels::new()),
+            channels: Arc::new(parking_lot::RwLock::new(channels::AnyChannels::new())),
         }
     }
 

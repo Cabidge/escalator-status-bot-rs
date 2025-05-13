@@ -6,13 +6,12 @@ use crate::{
 };
 
 use itertools::Itertools;
+use poise::serenity_prelude::{ButtonStyle, CreateActionRow, CreateButton};
 
 pub async fn gist(pool: &sqlx::PgPool) -> Result<serenity::CreateEmbed, sqlx::Error> {
     // -- Setup
 
-    let mut embed = serenity::CreateEmbed::default();
-
-    embed.title("Here's the gist...");
+    let embed = serenity::CreateEmbed::default().title("Here's the gist...");
 
     let escalator_count = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM escalators")
         .fetch_one(pool)
@@ -44,7 +43,7 @@ pub async fn gist(pool: &sqlx::PgPool) -> Result<serenity::CreateEmbed, sqlx::Er
     if !summaries.is_empty() {
         // -- Some are Down/Blocked
 
-        embed.color((240, 60, 60)).description(summaries.join("\n"));
+        let embed = embed.color((240, 60, 60)).description(summaries.join("\n"));
 
         return Ok(embed);
     }
@@ -53,7 +52,7 @@ pub async fn gist(pool: &sqlx::PgPool) -> Result<serenity::CreateEmbed, sqlx::Er
 
     let emoji = Status::Open.emoji();
 
-    embed
+    let embed = embed
         .description(format!("`{emoji}` `ALL` escalators are `OPEN`! 🥳 🎉"))
         .color((55, 220, 70));
 
@@ -194,24 +193,16 @@ pub const REPORT_BUTTON_ID: &str = "REPORT";
 pub const INFO_EMOJI: char = '❔';
 pub const INFO_BUTTON_ID: &str = "INFO";
 
-pub fn menu_buttons() -> serenity::CreateComponents {
-    let mut components = serenity::CreateComponents::default();
-
-    components.create_action_row(|row| {
-        row.create_button(|btn| {
-            btn.label("Report")
-                .emoji(REPORT_EMOJI)
-                .style(serenity::ButtonStyle::Primary)
-                .custom_id(REPORT_BUTTON_ID)
-        })
-        .create_button(|btn| {
-            btn.emoji(INFO_EMOJI)
-                .style(serenity::ButtonStyle::Secondary)
-                .custom_id(INFO_BUTTON_ID)
-        })
-    });
-
-    components
+pub fn menu_buttons() -> CreateActionRow {
+    CreateActionRow::Buttons(vec![
+        CreateButton::new(REPORT_BUTTON_ID)
+            .label("Report")
+            .emoji(REPORT_EMOJI)
+            .style(ButtonStyle::Primary),
+        CreateButton::new(INFO_BUTTON_ID)
+            .emoji(INFO_EMOJI)
+            .style(ButtonStyle::Secondary),
+    ])
 }
 
 /// Explanation: https://gist.github.com/LeviSnoot/d9147767abeef2f770e9ddcd91eb85aa

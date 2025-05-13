@@ -12,7 +12,7 @@ use bot_tasks::{
     BotTask,
 };
 use futures::future::BoxFuture;
-use poise::serenity_prelude::{MessageComponentInteraction, ShardMessenger};
+use poise::serenity_prelude::{Cache, CacheHttp, ComponentInteraction, FullEvent, Http, ShardMessenger};
 use shuttle_runtime::{async_trait, CustomError, SecretStore};
 use std::{process::Termination, sync::Arc};
 use tokio::task;
@@ -20,9 +20,17 @@ use tokio::task;
 use prelude::*;
 
 struct EscalatorBot {
-    framework: Arc<poise::Framework<Data, Error>>,
-    tasks: Vec<task::JoinHandle<()>>,
+    framework: poise::Framework<Data, Error>,
+    token: String,
 }
+
+struct BotTasks<T> {
+    tasks: task::JoinSet<()>,
+    data: Data,
+    cache_http: Arc<T>,
+}
+
+struct CacheAndHttp(Arc<Cache>, Arc<Http>);
 
 #[shuttle_runtime::main]
 async fn init(
@@ -47,8 +55,6 @@ async fn init(
             event_handler,
             ..Default::default()
         })
-        .token(token)
-        .intents(serenity::GatewayIntents::non_privileged())
         .setup(move |_ctx, _ready, framework| {
             Box::pin(async move {
                 // set up bot data
@@ -59,75 +65,108 @@ async fn init(
                 Ok(Data::new(shard_manager, pool))
             })
         })
-        .build()
-        .await
-        .map_err(anyhow::Error::new)?;
+        .build();
 
-    let bot = EscalatorBot::new(framework)
-        .add_task(AnnounceTask::default())
-        .add_task(AlertTask)
-        .add_task(InfoTask)
-        .add_task(ReportTask)
-        .add_task(SyncTask);
-
+    let bot = EscalatorBot::new(framework, token);
     Ok(bot)
 }
 
 impl EscalatorBot {
-    fn new(framework: Arc<poise::Framework<Data, Error>>) -> Self {
+    fn new(framework: poise::Framework<Data, Error>, token: String) -> Self {
         Self {
             framework,
-            tasks: vec![],
+            token,
         }
-    }
-
-    fn add_task<T: BotTask + 'static>(mut self, task: T) -> Self {
-        let framework = Arc::downgrade(&self.framework);
-        let handle = tokio::spawn(async move {
-            if let Some(data) = task.setup(framework).await {
-                let code = task.run(data).await.report();
-                log::debug!(
-                    "Task {} failed with exit code: {:?}",
-                    std::any::type_name::<T>(),
-                    code
-                )
-            } else {
-                log::error!(
-                    "Faield to run setup for bot task: {}",
-                    std::any::type_name::<T>()
-                );
-            }
-        });
-
-        self.tasks.push(handle);
-
-        self
     }
 }
 
 #[async_trait]
 impl shuttle_runtime::Service for EscalatorBot {
     async fn bind(mut self, _addr: std::net::SocketAddr) -> Result<(), shuttle_runtime::Error> {
-        self.framework.start().await.map_err(anyhow::Error::from)?;
+        let intents = serenity::GatewayIntents::non_privileged();
+        let data = self.framework.user_data().await.clone();
+
+        let mut client = serenity::ClientBuilder::new(self.token, intents)
+            .framework(self.framework)
+            .await
+            .unwrap();
+
+        let cache = Arc::clone(&client.cache);
+        let http = Arc::clone(&client.http);
+        let cache_http = Arc::new(CacheAndHttp(cache, http));
+        let mut bot_tasks = BotTasks::new(data, cache_http)
+            .start_task(AnnounceTask::default())
+            .await?
+            .start_task(AlertTask)
+            .await?
+            .start_task(InfoTask)
+            .await?
+            .start_task(ReportTask)
+            .await?
+            .start_task(SyncTask)
+            .await?;
+
+        client.start().await.map_err(anyhow::Error::from)?;
 
         // abort all bot tasks once client stops
-        for task in self.tasks {
-            task.abort();
-        }
+        bot_tasks.tasks.abort_all();
 
         Ok(())
     }
 }
 
+impl CacheHttp for CacheAndHttp {
+    fn cache(&self) -> Option<&Arc<Cache>> {
+        Some(&self.0)
+    }
+
+    fn http(&self) -> &Http {
+        &self.1
+    }
+}
+
+impl<T: CacheHttp> BotTasks<T> {
+    fn new(data: Data, cache_http: Arc<T>) -> Self {
+        Self {
+            tasks: task::JoinSet::new(),
+            data,
+            cache_http,
+        }
+    }
+
+    async fn start_task(mut self, task: impl BotTask<T> + 'static) -> anyhow::Result<Self> {
+        let Some(data) = task
+            .setup(&self.data, Arc::clone(&self.cache_http))
+            .await
+        else {
+            anyhow::bail!(
+                "Faield to run setup for bot task: {}",
+                std::any::type_name::<T>()
+            );
+        };
+
+        self.tasks.spawn(async move {
+            let code = task.run(data).await.report();
+            log::debug!(
+                "Task {} failed with exit code: {:?}",
+                std::any::type_name::<T>(),
+                code
+            )
+        });
+
+        Ok(self)
+    }
+}
+
 pub struct ComponentMessage {
-    interaction: MessageComponentInteraction,
+    interaction: ComponentInteraction,
     shard: ShardMessenger,
 }
 
 /// TODO: rework this system and reduce cloning
 fn event_handler<'a>(
     serenity_ctx: &'a serenity::Context,
-    event: &'a poise::Event<'a>,
+    event: &'a FullEvent,
     ctx: poise::FrameworkContext<'a, Data, Error>,
     _data: &'a Data,
 ) -> BoxFuture<'a, Result<(), Error>> {
@@ -135,10 +174,11 @@ fn event_handler<'a>(
 
     log::debug!("Event received: {event:?}");
 
-    if let poise::Event::InteractionCreate {
-        interaction: Interaction::MessageComponent(interaction),
-    } = event
-    {
+    let FullEvent::InteractionCreate { interaction } = event else {
+        return Box::pin(async { Ok(()) });
+    };
+
+    if let Interaction::Component(interaction) = interaction {
         if interaction.message.author.id == ctx.bot_id {
             log::debug!("Interaction received: {interaction:?}");
 

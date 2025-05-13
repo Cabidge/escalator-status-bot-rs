@@ -23,8 +23,8 @@ async fn set(ctx: Context<'_>, channel: serenity::Channel) -> Result<(), Error> 
             DO UPDATE SET channel_id = $2
         ",
     )
-    .bind(guild_id.0 as i64)
-    .bind(channel.id().0 as i64)
+    .bind(guild_id.get() as i64)
+    .bind(channel.id().get() as i64)
     .execute(&ctx.data().pool)
     .await;
 
@@ -56,7 +56,7 @@ async fn remove(ctx: Context<'_>) -> Result<(), Error> {
         WHERE guild_id = $1
         ",
     )
-    .bind(guild_id.0 as i64)
+    .bind(guild_id.get() as i64)
     .execute(&ctx.data().pool)
     .await;
 

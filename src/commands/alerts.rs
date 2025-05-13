@@ -3,6 +3,10 @@ use std::{str::FromStr, time::Duration};
 use futures::{StreamExt, TryStreamExt};
 use indexmap::IndexMap;
 use itertools::Itertools;
+use poise::{
+    serenity_prelude::{CreateActionRow, CreateButton},
+    CreateReply,
+};
 
 use crate::{generate, prelude::*};
 
@@ -42,18 +46,16 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
 
     let mut watchlist = WatchlistComponent { watchlist };
 
-    let handle = ctx
-        .send(|msg| {
-            msg.content(generate::timeout_message(TIMEOUT))
-                .components(replace_builder_with(watchlist.render()))
-        })
-        .await?;
+    let reply = CreateReply::default()
+        .content(generate::timeout_message(TIMEOUT))
+        .components(watchlist.render());
+    let handle = ctx.send(reply).await?;
 
     let mut actions = handle
         .message()
         .await?
         .await_component_interactions(&ctx.serenity_context().shard)
-        .build();
+        .stream();
 
     let res = loop {
         let sleep = tokio::time::sleep(TIMEOUT);
@@ -78,45 +80,38 @@ pub async fn edit(ctx: Context<'_>) -> Result<(), Error> {
             break Some(watchlist);
         }
 
-        handle
-            .edit(ctx, |msg| {
-                msg.content(generate::timeout_message(TIMEOUT))
-                    .components(replace_builder_with(watchlist.render()))
-            })
-            .await?;
+        let edit = CreateReply::default()
+            .content(generate::timeout_message(TIMEOUT))
+            .components(watchlist.render());
+        handle.edit(ctx, edit).await?;
     };
 
-    actions.stop();
+    drop(actions);
 
     // clear the components
-    handle
-        .edit(ctx, |msg| {
-            msg.content("Processing...")
-                .components(|components| components.set_action_rows(vec![]))
-        })
-        .await?;
+    let edit = CreateReply::default()
+        .content("Processing...")
+        .components(vec![]);
+    handle.edit(ctx, edit).await?;
 
     let Some(watchlist) = res else {
-        handle
-            .edit(ctx, |msg| {
-                msg.content("Interaction timed out, try again...")
-            })
-            .await?;
+        let edit = CreateReply::default().content("Interaction timed out, try again...");
+        handle.edit(ctx, edit).await?;
 
         return Ok(());
     };
 
     if let Err(err) = update_watchlist(&ctx.data().pool, ctx.author().id, watchlist).await {
         log::error!("An error ocurred trying to update watchlist: {err}");
-        handle
-            .edit(ctx, |msg| msg.content("A database error ocurred."))
-            .await?;
+        let edit = CreateReply::default().content("A database error ocurred.");
+        handle.edit(ctx, edit).await?;
 
         return Ok(());
     }
 
+    let edit = CreateReply::default().content("Watchlist updated.");
     handle
-        .edit(ctx, |msg| msg.content("Watchlist updated."))
+        .edit(ctx, edit)
         .await?;
 
     Ok(())
@@ -138,7 +133,7 @@ pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
         ORDER BY a.floor_start, a.floor_end
         ",
     )
-    .bind(ctx.author().id.0 as i64)
+    .bind(ctx.author().id.get() as i64)
     .fetch_all(&ctx.data().pool)
     .await;
 
@@ -184,7 +179,7 @@ async fn load_watchlist(
         ORDER BY e.floor_start + e.floor_end, e.floor_start
         ",
     )
-    .bind(user_id.0 as i64)
+    .bind(user_id.get() as i64)
     .fetch(pool);
 
     while let Some(entry) = entries.try_next().await? {
@@ -225,7 +220,7 @@ async fn update_watchlist(
         )
         ",
     )
-    .bind(user_id.0 as i64)
+    .bind(user_id.get() as i64)
     .bind(&starts)
     .bind(&ends)
     .execute(&mut *transaction)
@@ -244,7 +239,7 @@ async fn update_watchlist(
         WHERE a.user_id IS NULL
         ",
     )
-    .bind(user_id.0 as i64)
+    .bind(user_id.get() as i64)
     .bind(&starts)
     .bind(&ends)
     .execute(&mut *transaction)
@@ -268,14 +263,14 @@ enum ComponentAction {
 }
 
 impl WatchlistComponent {
-    fn render(&self) -> serenity::CreateComponents {
+    fn render(&self) -> Vec<CreateActionRow> {
         let mut action_rows = self
             .watchlist
             .iter()
             .chunks(4)
             .into_iter()
             .map(|row| {
-                let mut action_row = serenity::CreateActionRow::default();
+                let mut buttons = vec![];
 
                 for (&floors, &sub) in row {
                     let id = format!("{ESCALATOR_BUTTON_ID_PREFIX}{floors}");
@@ -285,27 +280,26 @@ impl WatchlistComponent {
                         Subscription::Ignore => serenity::ButtonStyle::Secondary,
                     };
 
-                    action_row
-                        .create_button(|button| button.label(floors).custom_id(id).style(style));
+                    let button = CreateButton::new(id).label(floors.to_string()).style(style);
+
+                    buttons.push(button);
                 }
 
-                action_row
+                buttons
             })
             .collect_vec();
 
-        action_rows.last_mut().unwrap().create_button(|button| {
-            button
+        action_rows.last_mut().unwrap().push(
+            CreateButton::new(SUBMIT_BUTTON_ID)
                 .label("Save List")
-                .custom_id(SUBMIT_BUTTON_ID)
                 .style(serenity::ButtonStyle::Success)
-                .emoji(SUBMIT_BUTTON_EMOJI)
-        });
+                .emoji(SUBMIT_BUTTON_EMOJI),
+        );
 
-        let mut components = serenity::CreateComponents::default();
-
-        components.set_action_rows(action_rows);
-
-        components
+        action_rows
+            .into_iter()
+            .map(CreateActionRow::Buttons)
+            .collect()
     }
 
     fn execute(&mut self, command: ComponentAction) -> ComponentStatus<&Watchlist> {

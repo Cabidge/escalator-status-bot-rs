@@ -1,33 +1,23 @@
 use crate::{bot_tasks::BotTask, data::report::UserReport, generate, prelude::*};
 
 use futures::future::join_all;
-use poise::async_trait;
+use poise::serenity_prelude::{CacheHttp, ChannelId, MessageId};
 use std::sync::Arc;
 use tokio::sync::broadcast::{self, error::RecvError};
 
 pub struct SyncTask;
 
-pub struct TaskData {
+pub struct TaskData<T> {
     pool: sqlx::PgPool,
     reports: broadcast::Receiver<UserReport>,
-    cache_http: Arc<serenity::CacheAndHttp>,
+    cache_http: Arc<T>,
 }
 
-#[async_trait]
-impl BotTask for SyncTask {
-    type Data = TaskData;
+impl<T: CacheHttp + 'static> BotTask<T> for SyncTask {
+    type Data = TaskData<T>;
     type Term = anyhow::Result<()>;
 
-    async fn setup(
-        &self,
-        framework: std::sync::Weak<poise::Framework<Data, Error>>,
-    ) -> Option<Self::Data> {
-        let framework = framework.upgrade()?;
-
-        let cache_http = Arc::clone(&framework.client().cache_and_http);
-
-        let data = framework.user_data().await;
-
+    async fn setup(&self, data: &Data, cache_http: Arc<T>) -> Option<Self::Data> {
         Some(TaskData {
             pool: data.pool.clone(),
             reports: data.receiver(),
@@ -50,7 +40,7 @@ impl BotTask for SyncTask {
     }
 }
 
-async fn sync_menus(data: &TaskData) -> Result<(), sqlx::Error> {
+async fn sync_menus(data: &TaskData<impl CacheHttp>) -> Result<(), sqlx::Error> {
     let menus = sqlx::query_as::<_, (i64, i64)>(
         "
         SELECT channel_id, message_id
@@ -67,23 +57,20 @@ async fn sync_menus(data: &TaskData) -> Result<(), sqlx::Error> {
 
     let statuses = generate::menu_status(&data.pool).await?;
 
-    let mut builder = serenity::EditMessage::default();
-
-    builder
+    let edit = serenity::EditMessage::default()
         .content(statuses)
-        .set_components(generate::menu_buttons());
-
-    let map = Arc::new(serenity::json::Value::from(
-        serenity::json::hashmap_to_json_map(builder.0),
-    ));
+        .components(vec![generate::menu_buttons()]);
 
     let update_all = menus.into_iter().map(|(channel_id, message_id)| {
-        let http = Arc::clone(&data.cache_http.http);
-        let map = Arc::clone(&map);
+        let cache_http = Arc::clone(&data.cache_http);
+        let channel_id = ChannelId::new(channel_id as u64);
+        let message_id = MessageId::new(message_id as u64);
+        let edit = edit.clone();
 
         async move {
-            let _ = http
-                .edit_message(channel_id as u64, message_id as u64, &map)
+            let _ = cache_http
+                .http()
+                .edit_message(channel_id, message_id, &edit, vec![])
                 .await
                 .ok();
         }

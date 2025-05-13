@@ -5,33 +5,23 @@ use crate::{data::report::UserReport, generate, prelude::*};
 use super::BotTask;
 
 use futures::future::join_all;
-use poise::async_trait;
+use poise::serenity_prelude::CacheHttp;
 use smallvec::{smallvec, SmallVec};
 use tokio::sync::broadcast;
 
 pub struct AlertTask;
 
-pub struct TaskData {
+pub struct TaskData<T> {
     pool: sqlx::PgPool,
     reports: broadcast::Receiver<UserReport>,
-    cache_http: Arc<serenity::CacheAndHttp>,
+    cache_http: Arc<T>,
 }
 
-#[async_trait]
-impl BotTask for AlertTask {
-    type Data = TaskData;
+impl<T: CacheHttp + 'static> BotTask<T> for AlertTask {
+    type Data = TaskData<T>;
     type Term = anyhow::Result<()>;
 
-    async fn setup(
-        &self,
-        framework: std::sync::Weak<poise::Framework<Data, Error>>,
-    ) -> Option<Self::Data> {
-        let framework = framework.upgrade()?;
-
-        let cache_http = Arc::clone(&framework.client().cache_and_http);
-
-        let data = framework.user_data().await;
-
+    async fn setup(&self, data: &Data, cache_http: Arc<T>) -> Option<Self::Data> {
         Some(TaskData {
             pool: data.pool.clone(),
             reports: data.receiver(),
@@ -93,10 +83,12 @@ impl BotTask for AlertTask {
             let send_all = users.into_iter().map(|(user_id,)| {
                 let message = message.clone();
                 let cache_http = Arc::clone(&data.cache_http);
-                let user = serenity::UserId(user_id as u64);
+                let user = serenity::UserId::new(user_id as u64);
                 async move {
-                    let Ok(dm) = user.create_dm_channel(&cache_http).await else { return };
-                    let _ = dm.say(&cache_http.http, message).await.ok();
+                    let Ok(dm) = user.create_dm_channel(&cache_http).await else {
+                        return;
+                    };
+                    let _ = dm.say(&cache_http, message).await.ok();
                 }
             });
 

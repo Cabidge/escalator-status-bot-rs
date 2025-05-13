@@ -2,6 +2,8 @@ mod alerts;
 mod history;
 mod menu;
 
+use poise::CreateReply;
+
 use crate::{generate, prelude::*};
 
 /// Returns a vector containing all enabled bot commands.
@@ -26,7 +28,7 @@ async fn register(ctx: Context<'_>) -> Result<(), Error> {
 /// (dev-only) Force quit the bot.
 #[poise::command(prefix_command, owners_only)]
 async fn kill(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.data().shard_manager.lock().await.shutdown_all().await;
+    ctx.data().shard_manager.shutdown_all().await;
     Ok(())
 }
 
@@ -37,8 +39,8 @@ async fn gist(ctx: Context<'_>) -> Result<(), Error> {
 
     match generate::gist(&ctx.data().pool).await {
         Ok(gist) => {
-            ctx.send(move |msg| msg.embed(replace_builder_with(gist)))
-                .await?;
+            let msg = CreateReply::default().embed(gist);
+            ctx.send(msg).await?;
         }
         Err(err) => {
             log::error!("An error ocurred trying to generate a gist: {err}");

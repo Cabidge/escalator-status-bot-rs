@@ -3,7 +3,7 @@ use crate::{data::report::UserReport, generate, prelude::*};
 use super::BotTask;
 
 use futures::future::join_all;
-use poise::async_trait;
+use poise::serenity_prelude::{CacheHttp, CreateMessage};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::broadcast;
 
@@ -12,10 +12,10 @@ pub struct AnnounceTask {
     max_reports_displayed: usize,
 }
 
-pub struct TaskData {
+pub struct TaskData<T> {
     pool: sqlx::PgPool,
     reports: broadcast::Receiver<UserReport>,
-    cache_http: Arc<serenity::CacheAndHttp>,
+    cache_http: Arc<T>,
 }
 
 impl Default for AnnounceTask {
@@ -27,21 +27,11 @@ impl Default for AnnounceTask {
     }
 }
 
-#[async_trait]
-impl BotTask for AnnounceTask {
-    type Data = TaskData;
+impl<T: CacheHttp + 'static> BotTask<T> for AnnounceTask {
+    type Data = TaskData<T>;
     type Term = anyhow::Result<()>;
 
-    async fn setup(
-        &self,
-        framework: std::sync::Weak<poise::Framework<Data, Error>>,
-    ) -> Option<Self::Data> {
-        let framework = framework.upgrade()?;
-
-        let cache_http = Arc::clone(&framework.client().cache_and_http);
-
-        let data = framework.user_data().await;
-
+    async fn setup(&self, data: &Data, cache_http: Arc<T>) -> Option<Self::Data> {
         Some(TaskData {
             pool: data.pool.clone(),
             reports: data.receiver(),
@@ -72,11 +62,11 @@ impl BotTask for AnnounceTask {
             log::info!("Generating announcement...");
 
             // get summary of the current escalator statuses
-            let mut embed = generate::gist(&data.pool).await?;
+            let embed = generate::gist(&data.pool).await?;
 
             let reports = generate::announcement(self.max_reports_displayed, reports.iter().rev());
 
-            embed.timestamp(chrono::Utc::now()).field(
+            let embed = embed.timestamp(chrono::Utc::now()).field(
                 "Recent reports (newest first)",
                 reports,
                 false,
@@ -87,12 +77,13 @@ impl BotTask for AnnounceTask {
 
             let send_all = channels.into_iter()
                 .map(|(channel_id,)| {
-                    let channel = serenity::ChannelId(channel_id as u64);
+                    let channel = serenity::ChannelId::new(channel_id as u64);
                     let embed = embed.clone();
                     let cache_http = Arc::clone(&data.cache_http);
 
                     async move {
-                        let res = channel.send_message(&cache_http.http, move |msg| msg.set_embed(embed))
+                        let msg = CreateMessage::new().embed(embed);
+                        let res = channel.send_message(&cache_http, msg)
                             .await;
 
                         match res {

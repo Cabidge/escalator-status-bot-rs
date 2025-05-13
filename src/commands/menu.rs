@@ -1,3 +1,5 @@
+use poise::serenity_prelude::{ChannelId, CreateMessage, MessageId};
+
 use crate::{generate, prelude::*};
 
 #[poise::command(slash_command, subcommands("init", "clear"), owners_only)]
@@ -24,7 +26,7 @@ async fn init(ctx: Context<'_>) -> Result<(), Error> {
         WHERE guild_id = $1
         ",
     )
-    .bind(guild_id.0 as i64)
+    .bind(guild_id.get() as i64)
     .fetch_optional(&mut *transaction)
     .await?
     .is_some();
@@ -40,11 +42,10 @@ async fn init(ctx: Context<'_>) -> Result<(), Error> {
     let statuses = generate::menu_status(&ctx.data().pool).await?;
     let menu_buttons = generate::menu_buttons();
 
-    let menu = channel_id
-        .send_message(ctx, |msg| {
-            msg.content(statuses).set_components(menu_buttons)
-        })
-        .await?;
+    let msg = CreateMessage::new()
+        .content(statuses)
+        .components(vec![menu_buttons]);
+    let menu = channel_id.send_message(ctx, msg).await?;
 
     let message_id = menu.id;
 
@@ -54,9 +55,9 @@ async fn init(ctx: Context<'_>) -> Result<(), Error> {
         VALUES ($1, $2, $3)
         ",
     )
-    .bind(guild_id.0 as i64)
-    .bind(channel_id.0 as i64)
-    .bind(message_id.0 as i64)
+    .bind(guild_id.get() as i64)
+    .bind(channel_id.get() as i64)
+    .bind(message_id.get() as i64)
     .execute(&mut *transaction)
     .await?;
 
@@ -84,7 +85,7 @@ async fn clear(ctx: Context<'_>) -> Result<(), Error> {
         RETURNING channel_id, message_id
         ",
     )
-    .bind(guild_id.0 as i64)
+    .bind(guild_id.get() as i64)
     .fetch_optional(&ctx.data().pool)
     .await?
     else {
@@ -92,9 +93,11 @@ async fn clear(ctx: Context<'_>) -> Result<(), Error> {
         return Ok(());
     };
 
+    let channel_id = ChannelId::new(channel_id as u64);
+    let message_id = MessageId::new(message_id as u64);
     let res = ctx
         .http()
-        .delete_message(channel_id as u64, message_id as u64)
+        .delete_message(channel_id, message_id, None)
         .await;
 
     if let Err(err) = res {

@@ -1,3 +1,5 @@
+use poise::serenity_prelude::{CreateActionRow, CreateButton};
+
 use crate::{
     data::{escalator_input::EscalatorInput, status::Status},
     generate::REPORT_EMOJI,
@@ -64,29 +66,25 @@ impl ReportComponent {
         }
     }
 
-    pub fn render(&self) -> serenity::CreateComponents {
-        let mut components = serenity::CreateComponents::default();
+    pub fn render(&self) -> Vec<CreateActionRow> {
+        let mut components = vec![];
 
         // add escalator components
-        components.0.append(&mut self.escalators.render().0);
+        components.append(&mut self.escalators.render());
 
         // selecting status
-        components
-            .create_action_row(|action_row| {
-                for status in [Status::Open, Status::Down, Status::Blocked] {
-                    let id = format!("{}{}", STATUS_BUTTON_ID_PREFIX, status.as_id_str());
-                    let mut button = ButtonState::selected_if(Some(status) == self.status)
-                        .or_else(|| ButtonState::disabled_if(self.status.is_some()))
-                        .create_button("", id);
+        let mut buttons = vec![];
+        for status in [Status::Open, Status::Down, Status::Blocked] {
+            let id = format!("{}{}", STATUS_BUTTON_ID_PREFIX, status.as_id_str());
+            let button = ButtonState::selected_if(Some(status) == self.status)
+                .or_else(|| ButtonState::disabled_if(self.status.is_some()))
+                .create_button("", id)
+                .emoji(status.emoji());
 
-                    button.emoji(status.emoji());
-
-                    action_row.add_button(button);
-                }
-
-                action_row
-            })
-            .create_action_row(|action_row| action_row.add_button(self.create_submit_button()));
+            buttons.push(button);
+        }
+        components.push(CreateActionRow::Buttons(buttons));
+        components.push(CreateActionRow::Buttons(vec![self.create_submit_button()]));
 
         components
     }
@@ -133,25 +131,17 @@ impl ReportComponent {
 
         let label = format!("Report {}!", escalators.short_noun());
 
-        let mut button = serenity::CreateButton::default();
-        button
-            .custom_id(SUBMIT_BUTTON_ID)
+        CreateButton::new(SUBMIT_BUTTON_ID)
+            .label(label)
             .style(serenity::ButtonStyle::Success)
             .emoji(REPORT_EMOJI)
-            .label(label);
-
-        button
     }
 
     fn disabled_submit_button(label: &str) -> serenity::CreateButton {
-        let mut button = serenity::CreateButton::default();
-        button
-            .custom_id(SUBMIT_BUTTON_ID)
+        CreateButton::new(SUBMIT_BUTTON_ID)
+            .label(label)
             .disabled(true)
             .style(serenity::ButtonStyle::Danger)
-            .label(label);
-
-        button
     }
 }
 
@@ -180,27 +170,29 @@ impl EscalatorComponent {
         }
     }
 
-    fn render(&self) -> serenity::CreateComponents {
+    fn render(&self) -> Vec<CreateActionRow> {
         const NUMBER_PANEL: [[u8; 4]; 2] = [[2, 4, 6, 8], [3, 5, 7, 9]];
 
-        let mut components = serenity::CreateComponents::default();
+        let mut components = vec![];
 
         for (row, numbers) in NUMBER_PANEL.into_iter().enumerate() {
-            components.create_action_row(|action_row| {
-                for floor in numbers {
-                    action_row.add_button(self.create_floor_button(floor));
-                }
+            let mut buttons = vec![];
 
-                let button = match row {
-                    // top row
-                    0 => self.create_pair_button(),
-                    // bottom row
-                    1 => self.create_all_button(),
-                    _ => unreachable!(),
-                };
+            for floor in numbers {
+                buttons.push(self.create_floor_button(floor));
+            }
 
-                action_row.add_button(button)
-            });
+            let button = match row {
+                // top row
+                0 => self.create_pair_button(),
+                // bottom row
+                1 => self.create_all_button(),
+                _ => unreachable!(),
+            };
+
+            buttons.push(button);
+
+            components.push(CreateActionRow::Buttons(buttons));
         }
 
         components
@@ -369,8 +361,8 @@ impl FromStr for EscalatorAction {
 }
 
 impl ButtonState {
-    fn create_button(self, label: impl ToString, id: impl ToString) -> serenity::CreateButton {
-        let mut button = serenity::CreateButton::default();
+    fn create_button(self, label: impl ToString, id: impl ToString) -> CreateButton {
+        let button = CreateButton::new(id.to_string());
 
         let style = if self == Self::Selected {
             SELECTED_BUTTON_STYLE
@@ -383,10 +375,7 @@ impl ButtonState {
         button
             .style(style)
             .disabled(disabled)
-            .custom_id(id)
-            .label(label);
-
-        button
+            .label(label.to_string())
     }
 
     fn disabled_if(disabled: bool) -> Self {

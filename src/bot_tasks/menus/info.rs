@@ -8,15 +8,17 @@ use crate::{
 
 use indexmap::{indexmap, IndexMap};
 use lazy_static::lazy_static;
-use poise::async_trait;
+use poise::serenity_prelude::{
+    CacheHttp, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage,
+};
 use std::sync::Arc;
 use tokio::sync::broadcast::{self, error::RecvError};
 
 pub struct InfoTask;
 
-pub struct TaskData {
+pub struct TaskData<T> {
     interactions: broadcast::Receiver<Arc<ComponentMessage>>,
-    cache_http: Arc<serenity::CacheAndHttp>,
+    cache_http: Arc<T>,
 }
 
 lazy_static! {
@@ -51,21 +53,11 @@ lazy_static! {
     };
 }
 
-#[async_trait]
-impl BotTask for InfoTask {
-    type Data = TaskData;
+impl<T: CacheHttp + 'static> BotTask<T> for InfoTask {
+    type Data = TaskData<T>;
     type Term = anyhow::Result<()>;
 
-    async fn setup(
-        &self,
-        framework: std::sync::Weak<poise::Framework<Data, Error>>,
-    ) -> Option<Self::Data> {
-        let framework = framework.upgrade()?;
-
-        let cache_http = Arc::clone(&framework.client().cache_and_http);
-
-        let data = framework.user_data().await;
-
+    async fn setup(&self, data: &Data, cache_http: Arc<T>) -> Option<Self::Data> {
         Some(TaskData {
             interactions: data.receiver(),
             cache_http,
@@ -84,18 +76,23 @@ impl BotTask for InfoTask {
                 }
             };
 
+            let embed = CreateEmbed::new()
+                .title("What The Heck Does All Of This Mean?")
+                .fields(
+                    INFO_FIELDS
+                        .iter()
+                        .map(|(title, desc)| (*title, desc, false)),
+                );
+
+            let msg = CreateInteractionResponseMessage::new()
+                .embed(embed)
+                .ephemeral(true);
+
+            let res = CreateInteractionResponse::Message(msg);
+
             event
                 .interaction
-                .create_interaction_response(&data.cache_http.http, |res| {
-                    res.interaction_response_data(|data| {
-                        data.embed(|embed| {
-                            embed.title("What The Heck Does All Of This Mean?").fields(
-                                INFO_FIELDS.iter().map(|(title, desc)| (title, desc, false)),
-                            )
-                        })
-                        .ephemeral(true)
-                    })
-                })
+                .create_response(&data.cache_http, res)
                 .await?;
         }
     }
