@@ -133,11 +133,15 @@ fn event_handler<'a>(
 ) -> BoxFuture<'a, Result<(), Error>> {
     use serenity::Interaction;
 
+    log::debug!("Event received: {event:?}");
+
     if let poise::Event::InteractionCreate {
         interaction: Interaction::MessageComponent(interaction),
     } = event
     {
         if interaction.message.author.id == ctx.bot_id {
+            log::debug!("Interaction received: {interaction:?}");
+
             let create_value = || {
                 let message = ComponentMessage {
                     interaction: interaction.clone(),

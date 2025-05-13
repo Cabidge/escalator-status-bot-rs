@@ -65,6 +65,8 @@ impl BotTask for ReportTask {
                 }
             };
 
+            log::info!("Received REPORT interaction");
+
             let nyc_now = Utc::now().with_timezone(&NYCTimeZone);
 
             let is_weekday = nyc_now.weekday().num_days_from_monday() < 5;
@@ -169,9 +171,12 @@ async fn handle_report(
     let Some(report) = res else {
         log::debug!("Interaction timed out.");
 
-        event.interaction.edit_original_interaction_response(http, |msg| {
-            msg.content("Interaction timed out, try again...")
-        }).await?;
+        event
+            .interaction
+            .edit_original_interaction_response(http, |msg| {
+                msg.content("Interaction timed out, try again...")
+            })
+            .await?;
 
         return Ok(());
     };
