@@ -2,3 +2,5 @@
 Secrets.toml
 .Secrets.toml
 /shuttle_persist
+.shuttle*
+Secrets*.toml
